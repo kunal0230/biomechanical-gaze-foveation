@@ -19,7 +19,7 @@ export class RaymarchingRenderer {
         this.time = 0;
 
         // Foveated parameters
-        this.foveaRadius = 0.15; // Size of high-detail zone
+        this.foveaRadius = 0.25; // Size of high-detail zone
 
         this._initShaders();
         this._initBuffers();
@@ -397,7 +397,7 @@ export class RaymarchingRenderer {
                 // Center: High detail (LOD = 0)
                 // Periphery: Low detail (LOD = 1)
                 // ═══════════════════════════════════════════════════
-                float foveaFactor = smoothstep(radius * 0.3, radius * 2.5, distToGaze);
+                float foveaFactor = smoothstep(radius * 0.55, radius * 1.85, distToGaze);
                 float lod = foveaFactor; // 0.0 = max detail, 1.0 = min detail
                 
                 // Raymarching parameters also scale with LOD

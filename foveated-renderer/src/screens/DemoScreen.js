@@ -70,8 +70,8 @@ export class DemoScreen {
                     <div class="demo-controls-bar">
                         <div class="ctrl-item">
                             <label for="fovea-slider">Fovea Radius</label>
-                            <input type="range" id="fovea-slider" min="0.08" max="0.28" step="0.01" value="0.16">
-                            <span id="fovea-value" class="mono-num">0.16</span>
+                            <input type="range" id="fovea-slider" min="0.10" max="0.50" step="0.01" value="0.25">
+                            <span id="fovea-value" class="mono-num">0.25</span>
                         </div>
 
                         <div class="ctrl-item">
@@ -291,8 +291,8 @@ export class DemoScreen {
         if (this.showGaze) this.showGaze.checked = true;
         if (this.debugMode) this.debugMode.checked = false;
         if (this.foveaSlider) {
-            this.foveaSlider.value = 0.16;
-            this.foveaValue.textContent = '0.16';
+            this.foveaSlider.value = 0.25;
+            this.foveaValue.textContent = '0.25';
         }
         if (this.smoothingSlider) {
             this.smoothingSlider.value = 1.0;

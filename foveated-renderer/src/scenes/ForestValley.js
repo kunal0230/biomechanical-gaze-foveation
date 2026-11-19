@@ -55,22 +55,33 @@ export class ForestValley extends BaseScene {
                 return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
             }
 
-            // FBM for terrain - octaves throttled by LOD
-            float fbm(vec2 p, int octaves) {
+            // FBM for terrain - continuous fractional octave blending for smooth LOD (zero popping)
+            float fbmSmooth(vec2 p, float lod) {
                 float value = 0.0;
                 float amplitude = 0.5;
-                for (int i = 0; i < 4; i++) {
-                    if (i >= octaves) break;
-                    value += amplitude * noise(p);
-                    p *= 2.0;
-                    amplitude *= 0.5;
-                }
+                vec2 cur = p;
+                
+                // Octaves 1 & 2: macro topography (always full weight)
+                value += amplitude * noise(cur);
+                cur *= 2.0; amplitude *= 0.5;
+                value += amplitude * noise(cur);
+                cur *= 2.0; amplitude *= 0.5;
+                
+                // Octave 3: smoothly fades between lod 0.35 and 0.85
+                float w3 = clamp((0.85 - lod) / 0.50, 0.0, 1.0);
+                value += amplitude * noise(cur) * w3;
+                cur *= 2.0; amplitude *= 0.5;
+                
+                // Octave 4: micro-ridges smoothly fade between lod 0.0 and 0.50
+                float w4 = clamp((0.50 - lod) / 0.50, 0.0, 1.0);
+                value += amplitude * noise(cur) * w4;
+                
                 return value;
             }
 
-            float getHeight(vec2 p, int octaves) {
+            float getHeight(vec2 p, float lod) {
                 float valley = smoothstep(0.0, 8.0, abs(p.x));
-                float h = fbm(p * 0.15, octaves) * 3.5 * valley;
+                float h = fbmSmooth(p * 0.15, lod) * 3.5 * valley;
                 h -= (1.0 - valley) * 1.2;
                 return h;
             }
@@ -99,17 +110,14 @@ export class ForestValley extends BaseScene {
             const float WATER_LEVEL = -0.9;
 
             vec2 mapScene(vec3 p, float lod) {
-                int octaves = lod < 0.3 ? 4 : (lod < 0.6 ? 3 : 2);
-                float h = getHeight(p.xz, octaves);
+                float h = getHeight(p.xz, lod);
                 
-                // Micro-displacement grass bump (only evaluated in foveal zone)
+                // Micro-displacement grass bump (smoothly attenuated by LOD)
+                float grassWeight = clamp((0.55 - lod) / 0.55, 0.0, 1.0);
                 float grassBump = 0.0;
-                if (lod < 0.5 && abs(p.x) > 2.0) {
-                    float intensity = (1.0 - lod * 2.0) * 0.08;
-                    grassBump = noise(p.xz * 8.0) * intensity;
-                    if (lod < 0.25) {
-                        grassBump += noise(p.xz * 16.0) * intensity * 0.5;
-                    }
+                if (grassWeight > 0.0 && abs(p.x) > 2.0) {
+                    grassBump = noise(p.xz * 8.0) * grassWeight * 0.06;
+                    grassBump += noise(p.xz * 16.0) * pow(grassWeight, 2.0) * 0.03;
                 }
                 
                 float terrain = p.y - h - grassBump;
@@ -131,24 +139,20 @@ export class ForestValley extends BaseScene {
                 scales[0] = 1.3; scales[1] = 1.1; scales[2] = 1.5; scales[3] = 1.2;
                 scales[4] = 1.0; scales[5] = 1.4; scales[6] = 1.1; scales[7] = 1.3;
                 
-                int treeCount = lod < 0.4 ? 8 : (lod < 0.7 ? 6 : 4);
                 for (int i = 0; i < 8; i++) {
-                    if (i >= treeCount) break;
                     float treeD = sdMushroomTree(p, trees[i], scales[i]);
                     if (treeD < d) { d = treeD; mat = 1.0; }
                 }
                 
-                if (lod < 0.6) {
-                    vec3 rocks[4];
-                    rocks[0] = vec3(-3.0, 1.0, -5.0);
-                    rocks[1] = vec3(3.5, 0.8, -7.0);
-                    rocks[2] = vec3(-4.5, 1.2, -12.0);
-                    rocks[3] = vec3(4.0, 0.9, -10.0);
-                    
-                    for (int i = 0; i < 4; i++) {
-                        float rockD = sdRock(p, rocks[i], 0.3 + float(i) * 0.05);
-                        if (rockD < d) { d = rockD; mat = 2.0; }
-                    }
+                vec3 rocks[4];
+                rocks[0] = vec3(-3.0, 1.0, -5.0);
+                rocks[1] = vec3(3.5, 0.8, -7.0);
+                rocks[2] = vec3(-4.5, 1.2, -12.0);
+                rocks[3] = vec3(4.0, 0.9, -10.0);
+                
+                for (int i = 0; i < 4; i++) {
+                    float rockD = sdRock(p, rocks[i], 0.3 + float(i) * 0.05);
+                    if (rockD < d) { d = rockD; mat = 2.0; }
                 }
                 
                 return vec2(d, mat);
@@ -184,11 +188,11 @@ export class ForestValley extends BaseScene {
                 vec2 aspectGaze = u_gaze;
                 float distToGaze = length((uv - aspectGaze) * vec2(u_resolution.x / u_resolution.y, 1.0));
                 
-                float foveaRadius = u_foveaRadius * 1.2;
-                float lod = smoothstep(foveaRadius * 0.25, foveaRadius * 1.25, distToGaze);
+                float foveaRadius = u_foveaRadius * 1.35;
+                float lod = smoothstep(foveaRadius * 0.55, foveaRadius * 1.85, distToGaze);
                 
-                int maxSteps = int(mix(64.0, 20.0, lod));
-                float epsilon = mix(0.005, 0.04, lod);
+                int maxSteps = int(mix(64.0, 24.0, lod));
+                float epsilon = mix(0.004, 0.028, lod);
                 
                 float camT = u_time * 0.03;
                 vec3 ro = vec3(sin(camT) * 2.0, 5.0 + sin(camT * 0.5) * 0.5, 8.0);
@@ -258,22 +262,34 @@ export class ForestValley extends BaseScene {
                     col = mate * lin;
                 }
                 
-                // COMPUTE HEATMAP: Red/Amber = High compute (fovea), Cool Cyan/Blue = Low compute (periphery)
+                // COMPUTE HEATMAP: Continuous 3-tier gradient (Fovea -> Parafovea -> Periphery)
                 if (u_showHeatmap) {
-                    vec3 highCompute = vec3(1.0, 0.15, 0.05); // Red/Amber
-                    vec3 lowCompute = vec3(0.02, 0.45, 0.85);  // Deep Blue
-                    vec3 heatCol = mix(highCompute, lowCompute, lod);
-                    col = mix(col, heatCol, 0.55);
+                    vec3 foveaHeat = vec3(0.98, 0.22, 0.12);     // Vibrant Coral-Red (100% detail core)
+                    vec3 parafoveaHeat = vec3(0.95, 0.72, 0.18); // Warm Golden-Amber (Gradual blend)
+                    vec3 peripheryHeat = vec3(0.08, 0.45, 0.88); // Cool Deep Cyan-Blue (Peripheral base)
+                    
+                    vec3 heatCol;
+                    if (lod < 0.5) {
+                        heatCol = mix(foveaHeat, parafoveaHeat, lod * 2.0);
+                    } else {
+                        heatCol = mix(parafoveaHeat, peripheryHeat, (lod - 0.5) * 2.0);
+                    }
+                    col = mix(col, heatCol, 0.52);
                 }
 
-                // BIOLOGICAL VISUAL ANGLE RETICLE RINGS (Fovea 2° & Parafovea 5°)
+                // BIOLOGICAL VISUAL RETICLE RINGS (Core Fovea & Parafoveal Transition Boundary)
                 if (u_showRings) {
-                    float rInner = foveaRadius * 0.35;
-                    float rOuter = foveaRadius * 1.05;
-                    float ring1 = smoothstep(0.004, 0.0, abs(distToGaze - rInner));
-                    float ring2 = smoothstep(0.003, 0.0, abs(distToGaze - rOuter));
-                    col = mix(col, vec3(0.0, 1.0, 0.8), ring1 * 0.7);
-                    col = mix(col, vec3(1.0, 0.8, 0.2), ring2 * 0.5);
+                    float rInner = foveaRadius * 0.55;
+                    float rOuter = foveaRadius * 1.85;
+                    
+                    float ring1 = smoothstep(0.007, 0.0, abs(distToGaze - rInner));
+                    float halo1 = smoothstep(0.024, 0.0, abs(distToGaze - rInner)) * 0.25;
+                    
+                    float ring2 = smoothstep(0.005, 0.0, abs(distToGaze - rOuter));
+                    float halo2 = smoothstep(0.030, 0.0, abs(distToGaze - rOuter)) * 0.18;
+                    
+                    col = mix(col, vec3(0.0, 0.95, 0.85), (ring1 + halo1) * 0.8);
+                    col = mix(col, vec3(1.0, 0.78, 0.22), (ring2 + halo2) * 0.6);
                 }
                 
                 // Vignette & Tonemapping

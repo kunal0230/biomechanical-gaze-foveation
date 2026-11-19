@@ -26,7 +26,7 @@ export class SceneRenderer {
         this.time = 0;
 
         // Foveation settings
-        this.foveaRadius = 0.16;
+        this.foveaRadius = 0.25;
         this.showHeatmap = false;
         this.showRings = false;
         this.extraDetails = false;
@@ -116,7 +116,7 @@ export class SceneRenderer {
     }
 
     setFoveaRadius(radius) {
-        this.foveaRadius = Math.max(0.06, Math.min(0.35, radius));
+        this.foveaRadius = Math.max(0.08, Math.min(0.50, radius));
     }
 
     setGazePoint(x, y) {

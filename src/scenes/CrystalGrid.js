@@ -125,11 +125,11 @@ export class CrystalGrid extends BaseScene {
                 vec2 aspectGaze = u_gaze;
                 float distToGaze = length((uv - aspectGaze) * vec2(u_resolution.x / u_resolution.y, 1.0));
                 
-                float foveaRadius = u_foveaRadius * 1.25;
-                float lod = smoothstep(foveaRadius * 0.25, foveaRadius * 1.25, distToGaze);
+                float foveaRadius = u_foveaRadius * 1.35;
+                float lod = smoothstep(foveaRadius * 0.55, foveaRadius * 1.85, distToGaze);
                 
-                int maxSteps = lod < 0.3 ? 56 : (lod < 0.6 ? 38 : 20);
-                float epsilon = mix(0.002, 0.012, lod);
+                int maxSteps = int(mix(56.0, 22.0, lod));
+                float epsilon = mix(0.002, 0.016, lod);
                 
                 vec3 ro = vec3(0.0, 3.0, 4.0);
                 vec3 lookAt = vec3(0.0, 0.0, -1.0);
@@ -175,20 +175,34 @@ export class CrystalGrid extends BaseScene {
                     }
                 }
                 
+                // COMPUTE HEATMAP: Continuous 3-tier gradient (Fovea -> Parafovea -> Periphery)
                 if (u_showHeatmap) {
-                    vec3 highCompute = vec3(1.0, 0.15, 0.05);
-                    vec3 lowCompute = vec3(0.02, 0.45, 0.85);
-                    vec3 heatCol = mix(highCompute, lowCompute, lod);
-                    col = mix(col, heatCol, 0.55);
+                    vec3 foveaHeat = vec3(0.98, 0.22, 0.12);     // Vibrant Coral-Red (100% detail core)
+                    vec3 parafoveaHeat = vec3(0.95, 0.72, 0.18); // Warm Golden-Amber (Gradual blend)
+                    vec3 peripheryHeat = vec3(0.08, 0.45, 0.88); // Cool Deep Cyan-Blue (Peripheral base)
+                    
+                    vec3 heatCol;
+                    if (lod < 0.5) {
+                        heatCol = mix(foveaHeat, parafoveaHeat, lod * 2.0);
+                    } else {
+                        heatCol = mix(parafoveaHeat, peripheryHeat, (lod - 0.5) * 2.0);
+                    }
+                    col = mix(col, heatCol, 0.52);
                 }
 
+                // BIOLOGICAL VISUAL RETICLE RINGS (Core Fovea & Parafoveal Transition Boundary)
                 if (u_showRings) {
-                    float rInner = foveaRadius * 0.35;
-                    float rOuter = foveaRadius * 1.05;
-                    float ring1 = smoothstep(0.004, 0.0, abs(distToGaze - rInner));
-                    float ring2 = smoothstep(0.003, 0.0, abs(distToGaze - rOuter));
-                    col = mix(col, vec3(0.0, 1.0, 0.8), ring1 * 0.7);
-                    col = mix(col, vec3(1.0, 0.8, 0.2), ring2 * 0.5);
+                    float rInner = foveaRadius * 0.55;
+                    float rOuter = foveaRadius * 1.85;
+                    
+                    float ring1 = smoothstep(0.007, 0.0, abs(distToGaze - rInner));
+                    float halo1 = smoothstep(0.024, 0.0, abs(distToGaze - rInner)) * 0.25;
+                    
+                    float ring2 = smoothstep(0.005, 0.0, abs(distToGaze - rOuter));
+                    float halo2 = smoothstep(0.030, 0.0, abs(distToGaze - rOuter)) * 0.18;
+                    
+                    col = mix(col, vec3(0.0, 0.95, 0.85), (ring1 + halo1) * 0.8);
+                    col = mix(col, vec3(1.0, 0.78, 0.22), (ring2 + halo2) * 0.6);
                 }
                 
                 col = pow(col, vec3(0.45));

@@ -10,8 +10,8 @@ export class CalibrationUI {
         this.point = document.getElementById('calibration-point');
         this.status = document.getElementById('calibration-status');
 
-        this.pulseDuration = options.pulseDuration || 300;     // Saccade settling
-        this.captureDuration = options.captureDuration || 700; // Fixation capture
+        this.pulseDuration = options.pulseDuration || 750;     // Saccade settling
+        this.captureDuration = options.captureDuration || 1400; // Fixation capture
         this.marginRatio = options.marginRatio || 0.12;
 
         this.features = [];
@@ -94,13 +94,13 @@ export class CalibrationUI {
                 </div>
 
                 <p class="cal-instructions-text">
-                    Keep your head motionless. Look directly at each crosshair dot as it appears and hold steady until it advances.
+                    Keep your head motionless. Follow the target dot smoothly across the screen and hold steady fixation as each indicator contracts.
                 </p>
 
                 <div class="cal-actions-row">
                     <button id="cancel-calibration-btn" class="sys-btn">Cancel</button>
                     <button id="skip-calibration-btn" class="sys-btn">Use Baseline Preset</button>
-                    <button id="begin-calibration-btn" class="btn primary">Begin (12s)</button>
+                    <button id="begin-calibration-btn" class="btn primary">Begin (~22s)</button>
                 </div>
             </div>
         `;
@@ -140,7 +140,7 @@ export class CalibrationUI {
         for (let cd = 3; cd >= 1; cd--) {
             if (!this.isRunning) return false;
             this.status.textContent = `Starting in ${cd}...`;
-            await this._delay(600);
+            await this._delay(750);
         }
 
         const ring = document.getElementById('cal-ring');
@@ -155,13 +155,13 @@ export class CalibrationUI {
             if (ring) {
                 ring.style.transition = 'none';
                 ring.style.transform = 'scale(1.6)';
-                ring.style.borderColor = 'rgba(9, 105, 218, 0.3)';
+                ring.style.borderColor = 'rgba(9, 105, 218, 0.35)';
             }
             this.status.textContent = `Point ${i + 1} of ${points.length}`;
             await this._delay(this.pulseDuration);
 
             if (ring) {
-                ring.style.transition = `transform ${this.captureDuration}ms linear, border-color ${this.captureDuration}ms ease`;
+                ring.style.transition = `transform ${this.captureDuration}ms cubic-bezier(0.4, 0, 0.2, 1), border-color ${this.captureDuration}ms ease`;
                 ring.style.transform = 'scale(0.85)';
                 ring.style.borderColor = '#0969da';
             }

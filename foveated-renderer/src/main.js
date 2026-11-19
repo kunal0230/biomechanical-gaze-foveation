@@ -308,7 +308,7 @@ class App {
     _computeActiveWorkload(gazeX, gazeY) {
         // Exact discrete 12x12 numerical integration of fragment raymarching LOD across screen space
         const aspect = window.innerWidth / Math.max(1, window.innerHeight);
-        const foveaRadius = this.renderer ? this.renderer.foveaRadius : 0.16;
+        const foveaRadius = this.renderer ? this.renderer.foveaRadius : 0.25;
         const parafoveaRadius = foveaRadius * 2.2;
         const range = Math.max(0.001, parafoveaRadius - foveaRadius);
 
