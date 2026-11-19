@@ -124,3 +124,4 @@ export class OneEuroFilter2D {
         this.isSaccade = false;
     }
 }
+
