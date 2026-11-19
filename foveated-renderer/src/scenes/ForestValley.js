@@ -1,6 +1,6 @@
 /**
- * Forest Valley Scene - Matching reference aesthetic
- * Bumpy grass, blue sky, mushroom trees, calm river
+ * Forest Valley Scene - Procedural Natural Landscape
+ * Multi-octave FBM terrain, geometric mushroom trees, river reflection, and rock formations
  */
 
 import { BaseScene } from './BaseScene.js';
@@ -11,11 +11,11 @@ export class ForestValley extends BaseScene {
     }
 
     getDescription() {
-        return 'Lush valley with detailed grass and stylized trees';
+        return 'Procedural valley with FBM terrain, geometric trees, water, and rock formations';
     }
 
     getThumbnail() {
-        return 'linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #228B22 100%)';
+        return 'linear-gradient(135deg, #1e3a5f 0%, #2d5a3f 50%, #1a3323 100%)';
     }
 
     getMaxSteps() {
@@ -35,6 +35,7 @@ export class ForestValley extends BaseScene {
             uniform float u_time;
             uniform float u_foveaRadius;
             uniform bool u_showHeatmap;
+            uniform bool u_showRings;
             uniform bool u_extraDetails;
             
             out vec4 outColor;
@@ -54,7 +55,7 @@ export class ForestValley extends BaseScene {
                 return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
             }
 
-            // FBM for terrain - more octaves when focused
+            // FBM for terrain - octaves throttled by LOD
             float fbm(vec2 p, int octaves) {
                 float value = 0.0;
                 float amplitude = 0.5;
@@ -74,16 +75,13 @@ export class ForestValley extends BaseScene {
                 return h;
             }
 
-            // Mushroom-style tree (flat top)
+            // Mushroom-style tree SDF
             float sdMushroomTree(vec3 p, vec3 treePos, float scale) {
                 vec3 q = (p - treePos) / scale;
-                
-                // Trunk - thin cylinder
                 float trunk = length(q.xz) - 0.08;
                 trunk = max(trunk, -q.y - 0.1);
                 trunk = max(trunk, q.y - 1.0);
                 
-                // Canopy - flat disc/umbrella
                 vec3 cap = q - vec3(0.0, 1.1, 0.0);
                 float canopy = length(cap.xz) - 0.6;
                 canopy = max(canopy, abs(cap.y) - 0.15);
@@ -91,23 +89,20 @@ export class ForestValley extends BaseScene {
                 return min(trunk, canopy) * scale;
             }
 
-            // Rock
+            // Rock SDF
             float sdRock(vec3 p, vec3 pos, float size) {
                 vec3 q = p - pos;
-                float d = length(q / vec3(1.0, 0.6, 0.85)) - size;
-                return d;
+                return length(q / vec3(1.0, 0.6, 0.85)) - size;
             }
 
-            // Scene constants
             const vec3 SUN_DIR = normalize(vec3(0.3, 0.6, -0.4));
             const float WATER_LEVEL = -0.9;
 
             vec2 mapScene(vec3 p, float lod) {
-                // Terrain octaves based on LOD
                 int octaves = lod < 0.3 ? 4 : (lod < 0.6 ? 3 : 2);
                 float h = getHeight(p.xz, octaves);
                 
-                // Grass bump detail - key for visible LOD difference
+                // Micro-displacement grass bump (only evaluated in foveal zone)
                 float grassBump = 0.0;
                 if (lod < 0.5 && abs(p.x) > 2.0) {
                     float intensity = (1.0 - lod * 2.0) * 0.08;
@@ -121,7 +116,7 @@ export class ForestValley extends BaseScene {
                 float d = terrain;
                 float mat = 0.0;
                 
-                // Mushroom trees - scattered
+                // Tree instances
                 vec3 trees[8];
                 trees[0] = vec3(-5.0, 2.2, -8.0);
                 trees[1] = vec3(6.0, 2.0, -6.0);
@@ -136,7 +131,6 @@ export class ForestValley extends BaseScene {
                 scales[0] = 1.3; scales[1] = 1.1; scales[2] = 1.5; scales[3] = 1.2;
                 scales[4] = 1.0; scales[5] = 1.4; scales[6] = 1.1; scales[7] = 1.3;
                 
-                // Only render nearby trees based on LOD
                 int treeCount = lod < 0.4 ? 8 : (lod < 0.7 ? 6 : 4);
                 for (int i = 0; i < 8; i++) {
                     if (i >= treeCount) break;
@@ -144,7 +138,6 @@ export class ForestValley extends BaseScene {
                     if (treeD < d) { d = treeD; mat = 1.0; }
                 }
                 
-                // Rocks
                 if (lod < 0.6) {
                     vec3 rocks[4];
                     rocks[0] = vec3(-3.0, 1.0, -5.0);
@@ -171,21 +164,15 @@ export class ForestValley extends BaseScene {
                 ));
             }
 
-            // Bright blue sky
             vec3 getSky(vec3 rd) {
                 float y = rd.y;
-                
-                // Vibrant sky gradient
-                vec3 zenith = vec3(0.3, 0.55, 0.95);
+                vec3 zenith = vec3(0.25, 0.5, 0.9);
                 vec3 horizon = vec3(0.55, 0.75, 0.95);
-                
                 vec3 sky = mix(horizon, zenith, max(y, 0.0));
                 
-                // Sun
                 float sun = max(dot(rd, SUN_DIR), 0.0);
                 sky += vec3(1.0, 0.95, 0.8) * pow(sun, 24.0) * 0.6;
                 sky += vec3(1.0, 1.0, 0.95) * pow(sun, 256.0) * 1.2;
-                
                 return sky;
             }
 
@@ -193,17 +180,16 @@ export class ForestValley extends BaseScene {
                 vec2 uv = gl_FragCoord.xy / u_resolution.xy;
                 vec2 p = (gl_FragCoord.xy * 2.0 - u_resolution.xy) / min(u_resolution.x, u_resolution.y);
                 
-                float distToGaze = length(uv - u_gaze);
+                // Aspect-corrected gaze distance
+                vec2 aspectGaze = u_gaze;
+                float distToGaze = length((uv - aspectGaze) * vec2(u_resolution.x / u_resolution.y, 1.0));
                 
-                // LOD calculation - balanced fovea
-                float foveaSize = u_foveaRadius * 1.5;
-                float lod = smoothstep(foveaSize * 0.15, foveaSize * 1.2, distToGaze);
+                float foveaRadius = u_foveaRadius * 1.2;
+                float lod = smoothstep(foveaRadius * 0.25, foveaRadius * 1.25, distToGaze);
                 
-                // Adaptive quality
                 int maxSteps = int(mix(64.0, 20.0, lod));
                 float epsilon = mix(0.005, 0.04, lod);
                 
-                // Camera looking down the valley
                 float camT = u_time * 0.03;
                 vec3 ro = vec3(sin(camT) * 2.0, 5.0 + sin(camT * 0.5) * 0.5, 8.0);
                 vec3 lookAt = vec3(0.0, 1.5, -15.0);
@@ -216,9 +202,11 @@ export class ForestValley extends BaseScene {
                 float t = 0.0;
                 float maxDist = 50.0;
                 vec2 hit = vec2(maxDist, -1.0);
+                int marchStepsTaken = 0;
                 
                 for (int i = 0; i < 64; i++) {
                     if (i >= maxSteps) break;
+                    marchStepsTaken = i;
                     vec3 pos = ro + rd * t;
                     vec2 res = mapScene(pos, lod);
                     if (res.x < epsilon) { hit = vec2(t, res.y); break; }
@@ -227,78 +215,70 @@ export class ForestValley extends BaseScene {
                 }
                 
                 vec3 col = getSky(rd);
-                
-                // Water plane
                 float tWater = (WATER_LEVEL - ro.y) / rd.y;
                 
                 if (tWater > 0.0 && tWater < maxDist && (hit.y < 0.0 || tWater < hit.x)) {
                     vec3 wPos = ro + rd * tWater;
-                    
-                    // Calm waves
                     float wave = sin(wPos.x * 0.5 + u_time * 0.8) * cos(wPos.z * 0.3 + u_time * 0.5) * 0.015;
                     vec3 wNor = normalize(vec3(wave, 1.0, wave * 0.7));
-                    
                     vec3 ref = reflect(rd, wNor);
                     float fresnel = pow(1.0 - max(dot(wNor, -rd), 0.0), 2.5);
-                    
-                    // Vivid turquoise water
-                    vec3 waterCol = vec3(0.15, 0.5, 0.6);
+                    vec3 waterCol = vec3(0.12, 0.45, 0.55);
                     col = mix(waterCol, getSky(ref), 0.25 + fresnel * 0.35);
-                    
-                    // Sun reflection
                     float spec = pow(max(dot(ref, SUN_DIR), 0.0), 64.0);
-                    col += vec3(1.0, 0.95, 0.85) * spec * 1.0;
+                    col += vec3(1.0, 0.95, 0.85) * spec;
                 }
                 else if (hit.y >= 0.0) {
                     vec3 pos = ro + rd * hit.x;
                     vec3 nor = getNormal(pos, lod);
-                    
                     vec3 mate;
                     
                     if (hit.y < 0.5) {
-                        // Grass - bright vibrant green
                         float grassVar = noise(pos.xz * 3.0);
-                        vec3 darkGrass = vec3(0.25, 0.55, 0.18);
-                        vec3 lightGrass = vec3(0.45, 0.75, 0.28);
+                        vec3 darkGrass = vec3(0.22, 0.52, 0.16);
+                        vec3 lightGrass = vec3(0.42, 0.72, 0.26);
                         mate = mix(darkGrass, lightGrass, grassVar * (1.0 - lod * 0.4) + 0.35);
-                        
-                        // Yellow-green on slopes
                         float slope = 1.0 - nor.y;
                         mate = mix(mate, vec3(0.55, 0.6, 0.3), smoothstep(0.3, 0.6, slope) * 0.25);
                     }
                     else if (hit.y < 1.5) {
-                        // Tree - richer colors
-                        vec3 trunkBrown = vec3(0.4, 0.28, 0.15);
-                        vec3 canopyGreen = vec3(0.18, 0.5, 0.18);
+                        vec3 trunkBrown = vec3(0.38, 0.26, 0.14);
+                        vec3 canopyGreen = vec3(0.16, 0.48, 0.16);
                         mate = pos.y > 1.0 ? canopyGreen : trunkBrown;
                     }
                     else {
-                        // Rock - gray with moss
-                        mate = vec3(0.45, 0.42, 0.38);
+                        mate = vec3(0.42, 0.40, 0.37);
                     }
                     
-                    // Bright lighting - more contrast
                     float sun = max(dot(nor, SUN_DIR), 0.0);
                     float sky = 0.5 + 0.5 * nor.y;
-                    
                     vec3 sunCol = vec3(1.0, 0.95, 0.85);
                     vec3 skyCol = vec3(0.5, 0.6, 0.8);
-                    
                     vec3 lin = sunCol * sun * 1.1 + skyCol * sky * 0.45;
                     col = mate * lin;
                 }
                 
+                // COMPUTE HEATMAP: Red/Amber = High compute (fovea), Cool Cyan/Blue = Low compute (periphery)
                 if (u_showHeatmap) {
-                    vec3 heatCol = mix(vec3(0.0, 0.6, 1.0), vec3(1.0, 0.15, 0.0), lod);
-                    col = mix(col, heatCol, 0.5);
+                    vec3 highCompute = vec3(1.0, 0.15, 0.05); // Red/Amber
+                    vec3 lowCompute = vec3(0.02, 0.45, 0.85);  // Deep Blue
+                    vec3 heatCol = mix(highCompute, lowCompute, lod);
+                    col = mix(col, heatCol, 0.55);
+                }
+
+                // BIOLOGICAL VISUAL ANGLE RETICLE RINGS (Fovea 2° & Parafovea 5°)
+                if (u_showRings) {
+                    float rInner = foveaRadius * 0.35;
+                    float rOuter = foveaRadius * 1.05;
+                    float ring1 = smoothstep(0.004, 0.0, abs(distToGaze - rInner));
+                    float ring2 = smoothstep(0.003, 0.0, abs(distToGaze - rOuter));
+                    col = mix(col, vec3(0.0, 1.0, 0.8), ring1 * 0.7);
+                    col = mix(col, vec3(1.0, 0.8, 0.2), ring2 * 0.5);
                 }
                 
-                // Light vignette
-                col *= 0.7 + 0.3 * pow(16.0 * uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y), 0.1);
-                
-                // Tonemap
+                // Vignette & Tonemapping
+                col *= 0.75 + 0.25 * pow(16.0 * uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y), 0.1);
                 col = pow(col, vec3(0.45));
-                
                 outColor = vec4(clamp(col, 0.0, 1.0), 1.0);
             }
         `;

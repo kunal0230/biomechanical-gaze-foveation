@@ -1,6 +1,6 @@
 /**
- * FaceGuide - Face positioning overlay for camera preview
- * Guides user to position their face correctly for optimal eye tracking
+ * FaceGuide - Optical Alignment & Facial Posture Verification Overlay
+ * Guides subject to position head for optimal pupil & eyelid landmark detection
  */
 
 export class FaceGuide {
@@ -11,7 +11,7 @@ export class FaceGuide {
         this.faceDetected = false;
         this.facePosition = { x: 0.5, y: 0.5, size: 0 };
         this.status = 'searching'; // 'searching' | 'too_far' | 'too_close' | 'off_center' | 'good'
-        this.statusText = 'Looking for face...';
+        this.statusText = 'Acquiring facial landmarks...';
 
         this._createCanvas();
     }
@@ -33,21 +33,16 @@ export class FaceGuide {
         this.ctx = this.canvas.getContext('2d');
     }
 
-    /**
-     * Update face detection status
-     * @param {object|null} landmarks - MediaPipe face landmarks or null
-     */
     updateFace(landmarks) {
         if (!landmarks || landmarks.length === 0) {
             this.faceDetected = false;
             this.status = 'searching';
-            this.statusText = 'Looking for face...';
+            this.statusText = 'Acquiring facial landmarks...';
             return;
         }
 
         this.faceDetected = true;
 
-        // Calculate face bounding box from landmarks
         const xs = landmarks.map(l => l.x);
         const ys = landmarks.map(l => l.y);
         const minX = Math.min(...xs);
@@ -63,33 +58,30 @@ export class FaceGuide {
 
         this.facePosition = { x: centerX, y: centerY, size: faceSize };
 
-        // Determine status based on position and size
-        const idealSize = 0.35; // Face should be ~35% of frame width
-        const sizeTolerance = 0.1;
-        const centerTolerance = 0.15;
+        const idealSize = 0.35;
+        const sizeTolerance = 0.12;
+        const centerTolerance = 0.16;
 
         const offCenterX = Math.abs(centerX - 0.5);
-        const offCenterY = Math.abs(centerY - 0.45); // Slightly above center
+        const offCenterY = Math.abs(centerY - 0.45);
 
         if (faceSize < idealSize - sizeTolerance) {
             this.status = 'too_far';
-            this.statusText = 'Move closer to camera';
+            this.statusText = 'Move closer to sensor (ideal: 50-65 cm)';
         } else if (faceSize > idealSize + sizeTolerance + 0.1) {
             this.status = 'too_close';
-            this.statusText = 'Move back a little';
+            this.statusText = 'Move slightly back from sensor';
         } else if (offCenterX > centerTolerance || offCenterY > centerTolerance) {
             this.status = 'off_center';
-            this.statusText = 'Center your face';
+            this.statusText = 'Center face within alignment reticle';
         } else {
             this.status = 'good';
-            this.statusText = 'Perfect! Ready to start';
+            this.statusText = 'Optimal alignment. Ready for calibration';
         }
     }
 
-    /**
-     * Render the face guide overlay
-     */
     render() {
+        if (!this.canvas) return;
         const rect = this.container.getBoundingClientRect();
         this.canvas.width = rect.width;
         this.canvas.height = rect.height;
@@ -97,31 +89,30 @@ export class FaceGuide {
         const ctx = this.ctx;
         const w = this.canvas.width;
         const h = this.canvas.height;
-
         ctx.clearRect(0, 0, w, h);
 
-        // Draw oval guide
         const ovalCenterX = w * 0.5;
-        const ovalCenterY = h * 0.45;
-        const ovalRadiusX = w * 0.18;
-        const ovalRadiusY = h * 0.28;
+        const ovalCenterY = h * 0.44;
+        const ovalRadiusX = w * 0.22;
+        const ovalRadiusY = h * 0.32;
 
-        // Determine color based on status
-        let guideColor = '#ff6b6b'; // Red - not good
-        let bgAlpha = 0.3;
+        let guideColor = '#ef4444'; // Red
+        let bgAlpha = 0.35;
 
         if (this.status === 'good') {
-            guideColor = '#51cf66'; // Green - good
-            bgAlpha = 0.2;
+            guideColor = '#10b981'; // Emerald
+            bgAlpha = 0.20;
         } else if (this.status === 'off_center') {
-            guideColor = '#ffd43b'; // Yellow - close
+            guideColor = '#f59e0b'; // Amber
+        } else if (this.status === 'searching') {
+            guideColor = '#06b6d4'; // Cyan
         }
 
-        // Draw darkened area outside oval
-        ctx.fillStyle = `rgba(0, 0, 0, ${bgAlpha})`;
+        // Darken periphery
+        ctx.fillStyle = `rgba(10, 14, 23, ${bgAlpha})`;
         ctx.fillRect(0, 0, w, h);
 
-        // Cut out oval (clear it)
+        // Punch out oval
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';
         ctx.beginPath();
@@ -129,77 +120,81 @@ export class FaceGuide {
         ctx.fill();
         ctx.restore();
 
-        // Draw oval border
+        // Oval stroke
         ctx.strokeStyle = guideColor;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([10, 5]);
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
         ctx.beginPath();
         ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Draw corner guides
-        const cornerSize = 20;
-        const margin = 30;
+        // Horizontal Eye Axis Guide
+        const eyeLineY = ovalCenterY - ovalRadiusY * 0.15;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(ovalCenterX - ovalRadiusX * 0.7, eyeLineY);
+        ctx.lineTo(ovalCenterX + ovalRadiusX * 0.7, eyeLineY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Precision corner marks
+        const cLen = 16;
+        const pad = 20;
         ctx.strokeStyle = guideColor;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2;
 
-        // Top-left
+        // TL
         ctx.beginPath();
-        ctx.moveTo(margin, margin + cornerSize);
-        ctx.lineTo(margin, margin);
-        ctx.lineTo(margin + cornerSize, margin);
+        ctx.moveTo(pad, pad + cLen);
+        ctx.lineTo(pad, pad);
+        ctx.lineTo(pad + cLen, pad);
         ctx.stroke();
 
-        // Top-right
+        // TR
         ctx.beginPath();
-        ctx.moveTo(w - margin - cornerSize, margin);
-        ctx.lineTo(w - margin, margin);
-        ctx.lineTo(w - margin, margin + cornerSize);
+        ctx.moveTo(w - pad - cLen, pad);
+        ctx.lineTo(w - pad, pad);
+        ctx.lineTo(w - pad, pad + cLen);
         ctx.stroke();
 
-        // Bottom-left
+        // BL
         ctx.beginPath();
-        ctx.moveTo(margin, h - margin - cornerSize);
-        ctx.lineTo(margin, h - margin);
-        ctx.lineTo(margin + cornerSize, h - margin);
+        ctx.moveTo(pad, h - pad - cLen);
+        ctx.lineTo(pad, h - pad);
+        ctx.lineTo(pad + cLen, h - pad);
         ctx.stroke();
 
-        // Bottom-right
+        // BR
         ctx.beginPath();
-        ctx.moveTo(w - margin - cornerSize, h - margin);
-        ctx.lineTo(w - margin, h - margin);
-        ctx.lineTo(w - margin, h - margin - cornerSize);
+        ctx.moveTo(w - pad - cLen, h - pad);
+        ctx.lineTo(w - pad, h - pad);
+        ctx.lineTo(w - pad, h - pad - cLen);
         ctx.stroke();
 
-        // Draw status text
-        ctx.font = 'bold 18px Inter, system-ui, sans-serif';
+        // Status text
+        ctx.font = '600 13px Inter, system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillStyle = guideColor;
-        ctx.fillText(this.statusText, w / 2, h - 40);
+        ctx.fillText(this.statusText, w / 2, h - 22);
 
-        // Draw face indicator if detected
+        // Center dot
         if (this.faceDetected) {
             const faceX = this.facePosition.x * w;
             const faceY = this.facePosition.y * h;
-
             ctx.beginPath();
-            ctx.arc(faceX, faceY, 8, 0, Math.PI * 2);
+            ctx.arc(faceX, faceY, 4, 0, Math.PI * 2);
             ctx.fillStyle = guideColor;
             ctx.fill();
         }
     }
 
-    /**
-     * Check if face is ready for calibration
-     */
     isReady() {
         return this.status === 'good';
     }
 
-    /**
-     * Destroy the overlay
-     */
     destroy() {
         if (this.canvas && this.canvas.parentNode) {
             this.canvas.parentNode.removeChild(this.canvas);

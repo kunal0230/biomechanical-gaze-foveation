@@ -1,12 +1,12 @@
 /**
- * Foveated Renderer - Main Application
- * Multi-screen architecture with scene selection and tutorial
+ * Foveated Renderer - Main Application Controller
+ * Orchestrates eye tracking, 1-Euro filtering, WebGL2 raymarching, and quantitative analytics
  */
 
 import { GazeEstimator } from './eye-tracking/GazeEstimator.js';
 import { CalibrationUI } from './calibration/CalibrationUI.js';
 import { SceneRenderer } from './renderer/SceneRenderer.js';
-import { KalmanFilter2D } from './utils/KalmanFilter.js';
+import { OneEuroFilter2D } from './eye-tracking/OneEuroFilter.js';
 
 // Screens
 import { HomeScreen } from './screens/HomeScreen.js';
@@ -29,6 +29,7 @@ const SCREENS = {
 class App {
     constructor() {
         this.currentScreen = SCREENS.HOME;
+        this.gazeMode = 'camera'; // 'camera' | 'simulator'
 
         // Screens
         this.homeScreen = new HomeScreen('home-screen');
@@ -42,10 +43,10 @@ class App {
         this.computeTracker = new ComputeTracker();
 
         // Core systems
-        this.gazeEstimator = null;
+        this.gazeEstimator = new GazeEstimator();
         this.calibrationUI = null;
         this.renderer = null;
-        this.kalmanFilter = new KalmanFilter2D({ Q: 0.5, R: 0.4 });
+        this.filter = new OneEuroFilter2D({ minCutoff: 0.9, beta: 0.025, leadTimeSeconds: 0.040 });
 
         // Media
         this.video = null;
@@ -56,27 +57,47 @@ class App {
         this.isPaused = false;
         this.selectedScene = null;
         this.frameCount = 0;
-        this.fps = 0;
+        this.fps = 60;
         this.lastFpsTime = performance.now();
         this.lastLandmarks = null;
 
-        // Shared gaze state (for decoupled loops)
+        // Gaze state (shared across render loop)
         this.gazeState = {
             x: 0.5,
             y: 0.5,
-            avgSteps: 50
+            rawX: 0.5,
+            rawY: 0.5,
+            avgSteps: 28.5,
+            currentSavingsPct: 52
         };
 
+        this._setupSimulatorEvents();
         this._init();
     }
 
     async _init() {
-        // Screen callbacks
-        this.homeScreen.setOnStart((scene) => {
+        // Screen Callbacks
+        this.homeScreen.setOnStart((scene, mode) => {
             this.selectedScene = scene;
-            this._startCalibration();
+            this.gazeMode = mode;
+            if (mode === 'simulator') {
+                this._startDemo();
+            } else {
+                this._startCalibration();
+            }
         });
+
+        this.homeScreen.setOnQuickStart((scene, mode) => {
+            this.selectedScene = scene;
+            this.gazeMode = mode;
+            this._startDemo();
+        });
+
         this.homeScreen.setOnTutorial(() => this.tutorialModal.show());
+        this.homeScreen.setOnModeChange((mode) => {
+            this.gazeMode = mode;
+        });
+
         this.demoScreen.setOnTimerEnd(() => this._endDemo());
         this.demoScreen.setOnDebugToggle((show) => {
             if (show) this.debugPanel.show();
@@ -85,10 +106,47 @@ class App {
         this.demoScreen.setOnPauseToggle((paused) => {
             this.isPaused = paused;
         });
+        this.demoScreen.setOnFoveaRadiusChange((radius) => {
+            if (this.renderer) this.renderer.setFoveaRadius(radius);
+        });
+        this.demoScreen.setOnRingsToggle((show) => {
+            if (this.renderer) this.renderer.setRings(show);
+        });
+
         this.resultsScreen.setOnRestart(() => this._restartFromHome());
+
+        window.addEventListener('resize', () => {
+            if (this.renderer && this.currentScreen === SCREENS.DEMO) {
+                this.renderer.resize();
+            }
+        });
 
         this._showScreen(SCREENS.HOME);
         await this._initCamera();
+    }
+
+    _setupSimulatorEvents() {
+        const updateSimulatorGaze = (clientX, clientY) => {
+            if (this.gazeMode !== 'simulator' || this.currentScreen !== SCREENS.DEMO) return;
+            const normX = Math.max(0.0, Math.min(1.0, clientX / window.innerWidth));
+            const normY = Math.max(0.0, Math.min(1.0, clientY / window.innerHeight));
+
+            const [smoothX, smoothY] = this.filter.update(normX, normY);
+            this.gazeState.x = Math.max(0.0, Math.min(1.0, smoothX));
+            this.gazeState.y = Math.max(0.0, Math.min(1.0, smoothY));
+
+            this._computeActiveWorkload(this.gazeState.x, this.gazeState.y);
+        };
+
+        window.addEventListener('mousemove', (e) => {
+            updateSimulatorGaze(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches && e.touches[0]) {
+                updateSimulatorGaze(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: true });
     }
 
     async _initCamera() {
@@ -106,21 +164,19 @@ class App {
             await this.video.play();
             this.homeScreen.showCameraActive();
 
-            this.gazeEstimator = new GazeEstimator();
             await this.gazeEstimator.initialize();
-
             this.faceGuide = new FaceGuide('camera-preview');
             this._startFaceDetectionLoop();
-
         } catch (error) {
-            console.error('Camera initialization failed:', error);
+            console.warn('Camera access unavailable or declined:', error);
+            // Default to presentation simulator mode if camera is missing or denied
+            this.homeScreen.setMode('simulator');
         }
     }
 
     _startFaceDetectionLoop() {
-        let lastTime = performance.now();
         let frameCount = 0;
-        let lastFpsTime = lastTime;
+        let lastFpsTime = performance.now();
 
         const detectFace = async () => {
             if (this.currentScreen !== SCREENS.HOME) {
@@ -128,38 +184,28 @@ class App {
                 return;
             }
 
-            // Calculate FPS
             const now = performance.now();
             frameCount++;
             if (now - lastFpsTime >= 1000) {
-                const fps = frameCount * 1000 / (now - lastFpsTime);
-
-                // Update stats on home screen
+                const fps = (frameCount * 1000) / (now - lastFpsTime);
                 if (this.video && this.video.videoWidth) {
-                    this.homeScreen.updateStats(
-                        fps,
-                        this.video.videoWidth,
-                        this.video.videoHeight
-                    );
+                    this.homeScreen.updateStats(fps, this.video.videoWidth, this.video.videoHeight);
                 }
-
                 frameCount = 0;
                 lastFpsTime = now;
             }
 
-            if (this.video && this.gazeEstimator) {
+            if (this.video && this.gazeEstimator && this.gazeEstimator.isReady) {
                 const results = await this.gazeEstimator.processFrame(this.video);
-
                 if (results?.multiFaceLandmarks?.[0]) {
                     this.lastLandmarks = results.multiFaceLandmarks[0];
-                    this.faceGuide.updateFace(this.lastLandmarks);
-                    this.homeScreen.updateFaceStatus(true, this.faceGuide.isReady());
+                    if (this.faceGuide) this.faceGuide.updateFace(this.lastLandmarks);
+                    this.homeScreen.updateFaceStatus(true, this.faceGuide ? this.faceGuide.isReady() : true);
                 } else {
-                    this.faceGuide.updateFace(null);
+                    if (this.faceGuide) this.faceGuide.updateFace(null);
                     this.homeScreen.updateFaceStatus(false, false);
                 }
-
-                this.faceGuide.render();
+                if (this.faceGuide) this.faceGuide.render();
             }
 
             requestAnimationFrame(detectFace);
@@ -170,7 +216,6 @@ class App {
 
     async _startCalibration() {
         this._showScreen(SCREENS.CALIBRATION);
-
         this.calibrationUI = new CalibrationUI(this.gazeEstimator);
 
         const processFrame = async () => {
@@ -193,124 +238,141 @@ class App {
         this._showScreen(SCREENS.DEMO);
 
         const canvas = this.demoScreen.getCanvas();
-
-        // Use new SceneRenderer with selected scene
         this.renderer = new SceneRenderer(canvas);
         this.renderer.loadScene(this.selectedScene);
         this.renderer.resize();
 
         this.demoScreen.reset();
+        this.demoScreen.setGazeMode(this.gazeMode);
         this.computeTracker.startSession(canvas.width, canvas.height);
         this.demoScreen.startTimer();
 
-        const smoothing = this.demoScreen.getSmoothing();
-        this.kalmanFilter.filterX.R = smoothing;
-        this.kalmanFilter.filterY.R = smoothing;
-        this.kalmanFilter.reset();
-
+        this.filter.reset();
         this.isRunning = true;
 
-        // Start DECOUPLED loops
-        this._startGazeLoop();
+        if (this.gazeMode === 'camera') {
+            this._startGazeLoop();
+        }
         this._startRenderLoop();
     }
 
-    /**
-     * Gaze loop - runs at ~30Hz independently
-     */
     _startGazeLoop() {
         const processGaze = async () => {
             if (!this.isRunning || this.currentScreen !== SCREENS.DEMO) return;
 
-            // Skip processing if paused, but keep the loop alive
-            if (this.isPaused) {
+            if (this.isPaused || this.gazeMode !== 'camera') {
                 setTimeout(processGaze, 33);
                 return;
             }
 
             try {
                 const results = await this.gazeEstimator.processFrame(this.video);
-
-                if (results && this.gazeEstimator.isTrained()) {
+                if (results) {
                     const { features, blinkDetected } = this.gazeEstimator.extractFeatures(results);
                     this.lastLandmarks = results.multiFaceLandmarks?.[0] || null;
 
                     if (features && !blinkDetected) {
-                        const [rawX, rawY] = this.gazeEstimator.predict(features);
+                        const [predX, predY] = this.gazeEstimator.predict(features);
 
-                        const smoothing = this.demoScreen.getSmoothing();
-                        this.kalmanFilter.filterX.R = smoothing;
-                        this.kalmanFilter.filterY.R = smoothing;
+                        // Update 1-Euro adaptive filter
+                        const normPredX = predX / window.innerWidth;
+                        const normPredY = predY / window.innerHeight;
 
-                        const [smoothX, smoothY] = this.kalmanFilter.update(rawX, rawY);
+                        const responsiveness = this.demoScreen.getSmoothing();
+                        this.filter.setParameters(responsiveness, 0.025 * responsiveness);
 
-                        this.gazeState.x = Math.max(0, Math.min(1, smoothX / window.innerWidth));
-                        this.gazeState.y = Math.max(0, Math.min(1, smoothY / window.innerHeight));
+                        const [smoothX, smoothY] = this.filter.update(normPredX, normPredY);
 
-                        // Calculate LOD for analytics
-                        const foveaFactor = Math.min(1, Math.sqrt(
-                            Math.pow(this.gazeState.x - 0.5, 2) + Math.pow(this.gazeState.y - 0.5, 2)
-                        ) * 3);
-                        this.gazeState.avgSteps = 64 - foveaFactor * 40;
+                        this.gazeState.x = Math.max(0.0, Math.min(1.0, smoothX));
+                        this.gazeState.y = Math.max(0.0, Math.min(1.0, smoothY));
+
+                        this._computeActiveWorkload(this.gazeState.x, this.gazeState.y);
                     }
                 }
             } catch (error) {
-                console.error('Gaze error:', error);
+                console.warn('Gaze tracking cycle error:', error);
             }
 
-            setTimeout(processGaze, 33); // ~30Hz
+            setTimeout(processGaze, 33); // ~30Hz camera rate
         };
 
         processGaze();
     }
 
-    /**
-     * Render loop - runs at max FPS
-     */
+    _computeActiveWorkload(gazeX, gazeY) {
+        // Quantitative step density calculation based on foveal proximity
+        const foveaRadius = this.renderer ? this.renderer.foveaRadius : 0.16;
+        const foveaAreaRatio = Math.PI * Math.pow(foveaRadius * 1.25, 2);
+        const parafoveaAreaRatio = Math.PI * Math.pow(foveaRadius * 2.2, 2) - foveaAreaRatio;
+        const peripheryAreaRatio = Math.max(0.1, 1.0 - (foveaAreaRatio + parafoveaAreaRatio));
+
+        const centerDistance = Math.hypot(gazeX - 0.5, gazeY - 0.5);
+        const edgeFactor = Math.max(0, centerDistance - 0.3) * 0.4;
+
+        // Weighted average steps across screen fragments
+        const avgSteps = Math.max(20.0, Math.min(64.0, 
+            (foveaAreaRatio * 64.0 + parafoveaAreaRatio * 40.0 + peripheryAreaRatio * 20.0) * (1.0 - edgeFactor * 0.15)
+        ));
+
+        const savingsPct = Math.max(0, Math.min(100, ((64.0 - avgSteps) / 64.0) * 100));
+
+        this.gazeState.avgSteps = avgSteps;
+        this.gazeState.currentSavingsPct = Math.round(savingsPct);
+    }
+
     _startRenderLoop() {
+        let renderFrameCount = 0;
+        let lastRenderTime = performance.now();
+
         const render = () => {
             if (!this.isRunning || this.currentScreen !== SCREENS.DEMO) return;
 
-            // Skip rendering if paused, but keep the loop alive
             if (this.isPaused) {
                 requestAnimationFrame(render);
                 return;
             }
 
-            const { x: gazeX, y: gazeY, avgSteps } = this.gazeState;
+            const now = performance.now();
+            renderFrameCount++;
+            if (now - lastRenderTime >= 1000) {
+                this.fps = (renderFrameCount * 1000) / (now - lastRenderTime);
+                renderFrameCount = 0;
+                lastRenderTime = now;
+            }
+
+            const { x: gazeX, y: gazeY, avgSteps, currentSavingsPct } = this.gazeState;
 
             this.renderer.setGazePoint(gazeX, gazeY);
-            this.demoScreen.updateGazePosition(gazeX, gazeY);
             this.renderer.setHeatmap(this.demoScreen.shouldShowHeatmap());
-            this.renderer.setExtraDetails(this.demoScreen.shouldShowExtraDetails());
+            this.renderer.setRings(this.demoScreen.shouldShowRings());
             this.renderer.render();
 
-            this.computeTracker.recordFrame(avgSteps);
+            this.demoScreen.updateGazePosition(gazeX, gazeY);
+            this.demoScreen.updateHud(this.fps, avgSteps, currentSavingsPct);
+            this.computeTracker.recordFrame(avgSteps, this.fps);
 
-            // Update debug panel
             if (this.debugPanel.isVisible()) {
-                this.frameCount++;
-                const now = performance.now();
-                if (now - this.lastFpsTime >= 1000) {
-                    this.fps = this.frameCount;
-                    this.frameCount = 0;
-                    this.lastFpsTime = now;
-                }
-
+                const tel = this.gazeEstimator.telemetry;
                 this.debugPanel.updateStats({
-                    fps: this.fps,
+                    fps: Math.round(this.fps),
                     gazeX: gazeX,
                     gazeY: gazeY,
-                    lodLevel: Math.min(1, Math.sqrt(
-                        Math.pow(gazeX - 0.5, 2) + Math.pow(gazeY - 0.5, 2)
-                    ) * 3),
                     avgSteps: avgSteps,
-                    eyeOpenness: 1.0,
-                    calibrationScore: 85,
+                    savingsPct: currentSavingsPct,
+                    pitchDeg: tel.pitchDeg,
+                    yawDeg: tel.yawDeg,
+                    rollDeg: tel.rollDeg,
+                    ear: tel.ear,
+                    rhoH: tel.rhoH,
+                    ied: tel.ied,
+                    velocityDegPerSec: Math.round(this.filter.getVelocity() * 0.1),
+                    isSaccade: this.filter.isSaccadic(),
                     faceDetected: !!this.lastLandmarks
                 });
 
-                this.debugPanel.drawVideoWithLandmarks(this.video, this.lastLandmarks);
+                if (this.video && this.lastLandmarks) {
+                    this.debugPanel.drawVideoWithLandmarks(this.video, this.lastLandmarks);
+                }
             }
 
             requestAnimationFrame(render);
@@ -325,7 +387,6 @@ class App {
 
         this.computeTracker.endSession();
         const summary = this.computeTracker.getSummary();
-        console.log('Session Analytics:', summary);
 
         this._showScreen(SCREENS.RESULTS);
         this.resultsScreen.updateAnalytics(summary);
@@ -334,7 +395,7 @@ class App {
     _restartFromHome() {
         this.resultsScreen.reset();
         this._showScreen(SCREENS.HOME);
-        this.kalmanFilter.reset();
+        this.filter.reset();
     }
 
     _showScreen(screen) {

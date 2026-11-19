@@ -1,5 +1,6 @@
 /**
- * SceneCard - Card component for scene selection
+ * SceneCard - Environment Selector Component
+ * Displays 3D raymarching environment profile and complexity budget
  */
 
 export class SceneCard {
@@ -15,14 +16,19 @@ export class SceneCard {
     _create() {
         this.element = document.createElement('div');
         this.element.className = 'scene-card';
+
+        const maxSteps = typeof this.scene.getMaxSteps === 'function' ? this.scene.getMaxSteps() : 64;
+
         this.element.innerHTML = `
-            <div class="scene-thumbnail" style="background: ${this.scene.getThumbnail()}"></div>
-            <div class="scene-info">
-                <h3 class="scene-name">${this.scene.getName()}</h3>
-                <p class="scene-desc">${this.scene.getDescription()}</p>
+            <div class="scene-thumbnail" style="background: ${this.scene.getThumbnail()}">
+                <span class="scene-step-badge">${maxSteps} STEPS</span>
             </div>
-            <div class="scene-badge">
-                <span class="check-icon">✓</span>
+            <div class="scene-info">
+                <div class="scene-header-row">
+                    <h3 class="scene-name">${this.scene.getName()}</h3>
+                    <div class="scene-check-mark">SELECTED</div>
+                </div>
+                <p class="scene-desc">${this.scene.getDescription()}</p>
             </div>
         `;
 

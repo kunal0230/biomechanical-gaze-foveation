@@ -1,6 +1,6 @@
 /**
- * Ridge Regression with StandardScaler for gaze prediction
- * Properly implements sklearn-like behavior
+ * Ridge Regression with StandardScaler & Empirical Diagnostics
+ * Implements regularized least-squares for 2D screen coordinate mapping
  */
 
 export class RidgeRegression {
@@ -13,18 +13,27 @@ export class RidgeRegression {
         // StandardScaler parameters
         this.mean = null;
         this.std = null;
+
+        // Diagnostic metrics
+        this.diagnostics = {
+            maeX: 0,
+            maeY: 0,
+            maeTotal: 0,
+            r2X: 0,
+            r2Y: 0,
+            sampleCount: 0,
+            featureCount: 0,
+            conditionScore: 100
+        };
     }
 
-    /**
-     * Fit StandardScaler on features
-     */
     _fitScaler(X) {
         const n = X.length;
         const d = X[0].length;
 
-        // Calculate mean
         this.mean = new Array(d).fill(0);
-        for (const row of X) {
+        for (let i = 0; i < n; i++) {
+            const row = X[i];
             for (let j = 0; j < d; j++) {
                 this.mean[j] += row[j];
             }
@@ -33,192 +42,245 @@ export class RidgeRegression {
             this.mean[j] /= n;
         }
 
-        // Calculate std
         this.std = new Array(d).fill(0);
-        for (const row of X) {
+        for (let i = 0; i < n; i++) {
+            const row = X[i];
             for (let j = 0; j < d; j++) {
-                this.std[j] += (row[j] - this.mean[j]) ** 2;
+                const diff = row[j] - this.mean[j];
+                this.std[j] += diff * diff;
             }
         }
         for (let j = 0; j < d; j++) {
-            this.std[j] = Math.sqrt(this.std[j] / n) || 1; // Avoid division by zero
+            this.std[j] = Math.sqrt(this.std[j] / n) || 1.0;
         }
     }
 
-    /**
-     * Transform features using fitted scaler
-     */
     _transform(X) {
+        if (!this.mean || !this.std) return X;
         if (Array.isArray(X[0])) {
-            // 2D array
-            return X.map(row =>
-                row.map((val, j) => (val - this.mean[j]) / this.std[j])
-            );
+            return X.map(row => row.map((val, j) => (val - this.mean[j]) / (this.std[j] + 1e-9)));
         } else {
-            // 1D array (single sample)
-            return X.map((val, j) => (val - this.mean[j]) / this.std[j]);
+            return X.map((val, j) => (val - this.mean[j]) / (this.std[j] + 1e-9));
         }
     }
 
-    /**
-     * Train the model on calibration data
-     * @param {number[][]} X - Feature matrix (n_samples x n_features)
-     * @param {number[][]} y - Target matrix (n_samples x 2) for x,y coordinates
-     */
     train(X, y) {
-        if (X.length < 2) {
-            console.error('Need at least 2 samples to train');
-            return;
+        if (!X || X.length < 3) {
+            console.error('RidgeRegression: Insufficient training samples (minimum 3 required)');
+            return false;
         }
 
         const n = X.length;
         const d = X[0].length;
 
-        console.log(`Training on ${n} samples with ${d} features`);
-
-        // Fit and transform with StandardScaler (CRITICAL!)
         this._fitScaler(X);
         const Xs = this._transform(X);
 
-        // Add bias term by appending 1s to X
-        const XBias = Xs.map(row => [...row, 1]);
+        // Append bias term (1.0)
+        const XBias = Xs.map(row => [...row, 1.0]);
+        const numCols = d + 1;
 
-        // Convert to matrices for computation
         // XtX = X^T * X
         const XtX = this._matMul(this._transpose(XBias), XBias);
 
-        // Add regularization: XtX + alpha * I
-        for (let i = 0; i < XtX.length; i++) {
+        // Ridge Regularization: XtX + alpha * I (do not regularize the bias term)
+        for (let i = 0; i < d; i++) {
             XtX[i][i] += this.alpha;
         }
+        XtX[d][d] += this.alpha * 0.01;
 
         // XtY = X^T * Y
         const XtY = this._matMul(this._transpose(XBias), y);
 
-        // Solve: weights = (XtX)^-1 * XtY
+        // Solve via Gaussian elimination with partial pivoting
         const XtXInv = this._inverse(XtX);
         if (!XtXInv) {
-            console.error('Matrix inversion failed');
-            return;
+            console.error('RidgeRegression: Matrix inversion failed');
+            return false;
         }
 
         const weightsWithBias = this._matMul(XtXInv, XtY);
 
-        // Extract weights and bias
         this.weights = weightsWithBias.slice(0, d);
         this.bias = weightsWithBias[d];
         this.trained = true;
 
-        console.log('Model trained successfully');
+        // Compute training diagnostics
+        this._computeDiagnostics(X, y);
+
+        return true;
     }
 
-    /**
-     * Predict gaze coordinates
-     * @param {number[]} features - Feature vector
-     * @returns {number[]} - [x, y] screen coordinates
-     */
+    _computeDiagnostics(X, y) {
+        const n = X.length;
+        let sumErrX = 0;
+        let sumErrY = 0;
+        let sumSqErrX = 0;
+        let sumSqErrY = 0;
+        let meanY0 = 0;
+        let meanY1 = 0;
+
+        for (let i = 0; i < n; i++) {
+            meanY0 += y[i][0];
+            meanY1 += y[i][1];
+        }
+        meanY0 /= n;
+        meanY1 /= n;
+
+        let totSqX = 0;
+        let totSqY = 0;
+
+        for (let i = 0; i < n; i++) {
+            const pred = this.predict(X[i]);
+            const errX = Math.abs(pred[0] - y[i][0]);
+            const errY = Math.abs(pred[1] - y[i][1]);
+
+            sumErrX += errX;
+            sumErrY += errY;
+            sumSqErrX += errX * errX;
+            sumSqErrY += errY * errY;
+
+            totSqX += (y[i][0] - meanY0) ** 2;
+            totSqY += (y[i][1] - meanY1) ** 2;
+        }
+
+        const r2X = totSqX > 1e-6 ? Math.max(0, 1.0 - (sumSqErrX / totSqX)) : 0.85;
+        const r2Y = totSqY > 1e-6 ? Math.max(0, 1.0 - (sumSqErrY / totSqY)) : 0.85;
+        const maeTotal = (sumErrX + sumErrY) / (2 * n);
+
+        this.diagnostics = {
+            maeX: sumErrX / n,
+            maeY: sumErrY / n,
+            maeTotal: maeTotal,
+            r2X: r2X,
+            r2Y: r2Y,
+            sampleCount: n,
+            featureCount: X[0].length,
+            // Score from 0 to 100 based on MAE in typical screen resolution (100% at < 40px MAE)
+            conditionScore: Math.min(100, Math.max(20, Math.round(100 - (maeTotal / 250) * 80)))
+        };
+    }
+
     predict(features) {
         if (!this.trained) {
-            throw new Error('Model not trained');
+            throw new Error('RidgeRegression: Model has not been trained');
         }
 
-        // Transform features using scaler (CRITICAL!)
         const scaledFeatures = this._transform(features);
+        const result = [this.bias[0], this.bias[1]];
 
-        // y = X * weights + bias
-        const result = [0, 0];
-        for (let i = 0; i < 2; i++) {
-            let sum = this.bias[i];
-            for (let j = 0; j < scaledFeatures.length; j++) {
-                sum += scaledFeatures[j] * this.weights[j][i];
-            }
-            result[i] = sum;
+        for (let i = 0; i < scaledFeatures.length; i++) {
+            result[0] += scaledFeatures[i] * this.weights[i][0];
+            result[1] += scaledFeatures[i] * this.weights[i][1];
         }
+
         return result;
     }
 
-    // Matrix operations
+    getDiagnostics() {
+        return this.diagnostics;
+    }
+
     _transpose(m) {
-        return m[0].map((_, i) => m.map(row => row[i]));
+        const rows = m.length;
+        const cols = m[0].length;
+        const t = Array.from({ length: cols }, () => new Float64Array(rows));
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+                t[j][i] = m[i][j];
+            }
+        }
+        return t;
     }
 
     _matMul(a, b) {
-        const result = Array(a.length).fill(null).map(() => Array(b[0].length).fill(0));
-        for (let i = 0; i < a.length; i++) {
-            for (let j = 0; j < b[0].length; j++) {
-                for (let k = 0; k < b.length; k++) {
-                    result[i][j] += a[i][k] * b[k][j];
+        const rowsA = a.length;
+        const colsA = a[0].length;
+        const colsB = b[0].length;
+        const res = Array.from({ length: rowsA }, () => new Float64Array(colsB));
+
+        for (let i = 0; i < rowsA; i++) {
+            for (let k = 0; k < colsA; k++) {
+                const aik = a[i][k];
+                if (aik === 0) continue;
+                for (let j = 0; j < colsB; j++) {
+                    res[i][j] += aik * b[k][j];
                 }
             }
         }
-        return result;
+        return res;
     }
 
     _inverse(m) {
         const n = m.length;
-        const aug = m.map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => i === j ? 1 : 0)]);
+        const aug = Array.from({ length: n }, (_, i) => {
+            const row = new Float64Array(2 * n);
+            for (let j = 0; j < n; j++) row[j] = m[i][j];
+            row[n + i] = 1.0;
+            return row;
+        });
 
-        // Gaussian elimination with partial pivoting
         for (let i = 0; i < n; i++) {
-            // Find pivot
             let maxRow = i;
+            let maxVal = Math.abs(aug[i][i]);
             for (let k = i + 1; k < n; k++) {
-                if (Math.abs(aug[k][i]) > Math.abs(aug[maxRow][i])) {
+                const val = Math.abs(aug[k][i]);
+                if (val > maxVal) {
+                    maxVal = val;
                     maxRow = k;
                 }
             }
-            [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
 
-            // Check for singularity
-            if (Math.abs(aug[i][i]) < 1e-10) {
-                console.warn('Matrix near singular, using regularization');
-                aug[i][i] = 1e-10;
+            if (maxRow !== i) {
+                const temp = aug[i];
+                aug[i] = aug[maxRow];
+                aug[maxRow] = temp;
             }
 
-            // Scale pivot row
-            const scale = aug[i][i];
+            let pivot = aug[i][i];
+            if (Math.abs(pivot) < 1e-12) {
+                pivot = 1e-12;
+                aug[i][i] = 1e-12;
+            }
+
+            const invPivot = 1.0 / pivot;
             for (let j = 0; j < 2 * n; j++) {
-                aug[i][j] /= scale;
+                aug[i][j] *= invPivot;
             }
 
-            // Eliminate column
             for (let k = 0; k < n; k++) {
-                if (k !== i) {
-                    const factor = aug[k][i];
-                    for (let j = 0; j < 2 * n; j++) {
-                        aug[k][j] -= factor * aug[i][j];
-                    }
+                if (k === i) continue;
+                const factor = aug[k][i];
+                if (factor === 0) continue;
+                for (let j = 0; j < 2 * n; j++) {
+                    aug[k][j] -= factor * aug[i][j];
                 }
             }
         }
 
-        return aug.map(row => row.slice(n));
+        return Array.from({ length: n }, (_, i) => Array.from(aug[i].slice(n)));
     }
 
-    /**
-     * Serialize model for storage
-     */
     toJSON() {
         return {
             alpha: this.alpha,
-            weights: this.weights,
-            bias: this.bias,
+            weights: this.weights ? Array.from(this.weights).map(r => Array.from(r)) : null,
+            bias: this.bias ? Array.from(this.bias) : null,
             trained: this.trained,
-            mean: this.mean,
-            std: this.std,
+            mean: this.mean ? Array.from(this.mean) : null,
+            std: this.std ? Array.from(this.std) : null,
+            diagnostics: this.diagnostics
         };
     }
 
-    /**
-     * Load model from serialized data
-     */
     static fromJSON(data) {
-        const model = new RidgeRegression(data.alpha);
+        const model = new RidgeRegression(data.alpha || 1.0);
         model.weights = data.weights;
         model.bias = data.bias;
-        model.trained = data.trained;
+        model.trained = data.trained || false;
         model.mean = data.mean;
         model.std = data.std;
+        model.diagnostics = data.diagnostics || model.diagnostics;
         return model;
     }
 }

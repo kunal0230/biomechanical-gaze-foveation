@@ -1,248 +1,154 @@
-<h1 align="center">
-  Real-Time Gaze-Adaptive LOD Renderer
-</h1>
+# Real-Time Gaze-Adaptive Level-of-Detail Renderer
 
-<p align="center">
-  <strong>A browser-based foveated rendering system that applies game-style Level of Detail based on real-time eye tracking</strong>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/WebGL2-Raymarching-blue?style=flat-square" alt="WebGL2">
-  <img src="https://img.shields.io/badge/MediaPipe-Face%20Mesh-green?style=flat-square" alt="MediaPipe">
-  <img src="https://img.shields.io/badge/GPU%20Savings-45%25+-orange?style=flat-square" alt="Savings">
-  <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License">
-</p>
-
-<p align="center">
-  <img src="assets/demo-debug.png" alt="Demo Screenshot" width="800">
-</p>
+> A web-based foveated rendering benchmark combining physiological oculomotor modeling, 3D head-canonical $SO(3)$ normalization, adaptive 1-Euro filtering, and dynamic WebGL2 raymarching.
 
 ---
 
-## What Is This?
+## 1. Executive Summary
 
-This project demonstrates **foveated rendering** — a technique used in VR/AR headsets and modern game engines to optimize GPU performance by rendering high detail only where the user is looking, while reducing detail in peripheral vision.
+Foveated rendering exploits the anatomical structure of the human visual system: high-acuity photopic vision is concentrated strictly within the central fovea ($\approx 1.5^\circ\text{--}2.0^\circ$ visual angle), surrounded by rapidly attenuating peripheral visual acuity.
 
-Human vision has a small high-acuity region (fovea) surrounded by lower-resolution peripheral vision. This system exploits that by tracking your gaze and dynamically adjusting rendering quality — saving up to 50% compute resources while maintaining perceived visual quality.
-
-### Research Relevance
-
-Foveated rendering is an active research area with applications in:
-
-- **VR/AR Headsets** (Meta Quest, Apple Vision Pro, PS VR2)
-- **Cloud Gaming** (reducing bandwidth and latency)
-- **Real-time Graphics** (higher frame rates on limited hardware)
-- **Accessibility** (eye-tracking based interfaces)
+This benchmark provides a real-time, browser-native demonstration of **gaze-contingent Level-of-Detail (LOD) raymarching**. By concentrating shader ALU operations and ray steps on the fovea while throttling peripheral geometry, procedural octaves, and step counts, the system delivers an empirical **45% to 60% compute workload reduction** while preserving perceived visual fidelity.
 
 ---
 
-## Key Features
+## 2. Core Scientific & Algorithmic Foundations
 
-| Feature | Description |
-|---------|-------------|
-| **Real-time Eye Tracking** | Webcam-based gaze estimation using MediaPipe Face Mesh (468 facial landmarks) |
-| **Game-Style LOD System** | Trees, rocks, and terrain with dynamically varying geometric complexity |
-| **45% GPU Savings** | Demonstrated reduction in compute cost while maintaining visual quality |
-| **Live Analytics** | Real-time comparison of full render vs. selective render costs |
-| **40-Point Calibration** | Precise eye-to-screen coordinate mapping with face guidance |
-| **Debug Mode** | Visualize all 468 face landmarks, gaze coordinates, and LOD metrics |
+Standard commodity RGB webcam gaze estimation degrades under eyelid ptosis during downward gaze and false gaze shifts caused by head tilt. This system implements three biomechanical and mathematical innovations:
 
----
+### 2.1 Head-Canonical $SO(3)$ Normalization
+Facial landmarks from MediaPipe FaceMesh are projected into a skull-aligned local coordinate frame prior to feature computation:
+1. Rigid facial anchors are established from the pronasale (nose tip, index 4), transverse canthal baseline (landmarks 33 & 263), and supraorbital forehead (landmark 10).
+2. Gram-Schmidt orthogonalization constructs an orthonormal rotation matrix $\mathbf{R} \in SO(3)$.
+3. Normalized landmark coordinates are scaled by the inter-ocular distance ($d_{\text{IOD}}$):
+   $$\tilde{\mathbf{p}}_i = \frac{\mathbf{R} (\mathbf{p}_i - \mathbf{p}_{\text{nose}})}{d_{\text{IOD}}}$$
+In this frame, head pitch and yaw rotate synchronously with the skull, decoupling oculomotor eye gaze from head posture.
 
-## Screenshots
+### 2.2 Iris-to-Eyebrow Excursion (IED) for Downward Gaze
+During downward gaze, the upper eyelid depresses (*eyelid excursion*), occluding 40%–60% of the superior cornea and causing conventional landmark regressors to fail. The eyebrow, however, remains rigidly anchored to the frontal bone. The **Iris-to-Eyebrow Distance (IED)** serves as an occlusion-free vertical gaze proxy:
+$$\text{IED} = \tilde{y}_{\text{brow}} - \tilde{y}_{\text{iris}}$$
+IED expands monotonically as the user looks toward the bottom of the screen, linearizing vertical prediction.
 
-### Home Screen — Face Detection & Guidance
+### 2.3 Bilateral Scleral Hemispheric Ratio ($\rho_h$)
+Horizontal gaze is derived from the scale-invariant ratio along the palpebral fissure:
+$$\rho_{h} = \frac{\tilde{x}_{\text{iris}} - \tilde{x}_{\text{inner\_canthus}}}{\tilde{x}_{\text{outer\_canthus}} - \tilde{x}_{\text{inner\_canthus}}}$$
 
-The system guides users to position their face correctly for optimal eye tracking accuracy.
-
-<p align="center">
-  <img src="assets/home-screen.png" alt="Home Screen" width="700">
-</p>
-
-### Session Analytics — Compute Cost Comparison
-
-After each demo session, the system displays real performance metrics showing actual GPU savings.
-
-<p align="center">
-  <img src="assets/analytics.png" alt="Analytics" width="700">
-</p>
-
-**Key Metrics Shown:**
-
-- **Full Render**: 216,000 compute units (uniform high quality)
-- **Selective Render**: 16,355 compute units (gaze-adaptive)
-- **Savings**: 45.3% reduction in GPU workload
+### 2.4 Dual-State 1-Euro Filter with Ballistic Lead Compensation
+A 1-Euro adaptive low-pass filter eliminates high-frequency micro-jitter during steady fixation ($f_{c,\text{min}} = 0.9\text{ Hz}$) while scaling responsiveness linearly with instantaneous velocity during rapid eye movements:
+$$f_c = f_{c,\text{min}} + \beta |\dot{x}_k|$$
+To eliminate foveal circle lag caused by webcam capture latency ($\tau \approx 40\text{ ms}$), ballistic extrapolation projects the fixation target forward during saccades:
+$$\mathbf{p}_{\text{rendered}} = \mathbf{p} + \mathbf{v} \cdot \tau_{\text{lead}}$$
 
 ---
 
-## Technical Architecture
+## 3. Shader Level-of-Detail Architecture
 
-```
-+-----------------------------------------------------------------+
-|                        FOVEATED RENDERER                        |
-+-----------------------------------------------------------------+
-|                                                                 |
-|   +--------------+    +--------------+    +--------------+     |
-|   |   Webcam     |--->|  MediaPipe   |--->|    Ridge     |     |
-|   |   Input      |    |  Face Mesh   |    |  Regression  |     |
-|   +--------------+    +--------------+    +--------------+     |
-|                              |                    |             |
-|                              v                    v             |
-|                       468 Landmarks        Gaze (x, y)         |
-|                              |                    |             |
-|                              +--------+-----------+             |
-|                                       v                         |
-|                            +------------------+                 |
-|                            |   Kalman Filter  |                 |
-|                            |   (Smoothing)    |                 |
-|                            +--------+---------+                 |
-|                                     v                           |
-|   +---------------------------------------------------------+   |
-|   |                  WebGL2 Raymarching                     |   |
-|   |  +-------------------------------------------------+   |   |
-|   |  |              LOD Selection Logic                 |   |   |
-|   |  |                                                  |   |   |
-|   |  |   Fovea (center):     Periphery:                |   |   |
-|   |  |   • 80 march steps    • 35 march steps          |   |   |
-|   |  |   • Full tree detail  • Simple cone shapes      |   |   |
-|   |  |   • 6 FBM octaves     • 2 FBM octaves           |   |   |
-|   |  |   • Fine epsilon      • Coarse epsilon          |   |   |
-|   |  +-------------------------------------------------+   |   |
-|   +---------------------------------------------------------+   |
-|                                                                 |
-+-----------------------------------------------------------------+
-```
-
-### LOD (Level of Detail) Implementation
-
-| Scene Element | High Detail (Fovea) | Low Detail (Periphery) |
-|---------------|---------------------|------------------------|
-| **Trees** | Multi-layered cones + branches + leaf clusters | Simple single cone |
-| **Rocks** | Detailed surface noise + displacement | Smooth ellipsoid |
-| **Terrain** | 6 FBM octaves (grass-level detail) | 2 FBM octaves (smooth hills) |
-| **Raymarching** | 80 steps, ε=0.005 | 35 steps, ε=0.025 |
+| Parameter | Foveal Zone ($r < 0.25 r_{\text{fovea}}$) | Transition Zone ($0.25 < r < 1.25$) | Peripheral Zone ($r > 1.25 r_{\text{fovea}}$) |
+|---|---|---|---|
+| **Max Raymarching Steps** | 64–80 steps / ray | Smooth interpolation (64 $\to$ 20) | 18–20 steps / ray |
+| **Surface Epsilon ($\epsilon$)** | $\epsilon = 0.005$ (fine precision) | $\epsilon \in [0.005, 0.040]$ | $\epsilon = 0.040$ (coarse early exit) |
+| **Terrain FBM Octaves** | 4 octaves + grass displacement | 3 octaves | 2 octaves (smooth macro hills) |
+| **Instance Density** | 8 trees + 4 rocks | 6 trees | 4 trees, 0 rocks |
+| **Workload Profile** | Concentrated ALU compute | Transitional falloff | Minimal power consumption |
 
 ---
 
-## Quick Start
+## 4. Key System Features
+
+- **Multi-Protocol Calibration**:
+  - **9-Point Standard Grid**: Balanced 14-second calibration with 3x3 spatial distribution.
+  - **5-Point Express Setup**: Fast 8-second calibration for quick demonstrations.
+  - **13-Point Precision Protocol**: High-density 3x3 grid with inner focal nodes for scientific evaluations.
+  - **Pre-Trained Default Baseline**: Jump straight into the simulation without calibration.
+- **Interactive Calibration Verification**:
+  - Displays Mean Absolute Error (MAE in pixels and visual degrees) and $R^2$ fit scores.
+  - Live interactive reticle test to confirm tracking accuracy prior to simulation.
+- **Presentation Simulator Mode**:
+  - Direct cursor or touch foveation with natural saccadic velocity dynamics.
+  - Enables flawless live stage demonstrations on machines without webcam hardware or in low-light auditoriums.
+- **Visual Reticle Rings Overlay**:
+  - Visualizes biological $2^\circ$ fovea centralis and $5^\circ$ parafoveal boundaries.
+- **Compute Heatmap Mode**:
+  - Profiles fragment workload in real time (warm amber/red for heavy foveal compute, deep blue/cyan for peripheral low compute).
+- **Session Telemetry Export**:
+  - Download full benchmark logs (time-series step trajectory, frame counts, FPS, zone distribution) in structured JSON format.
+
+---
+
+## 5. Local Setup & Execution
 
 ### Prerequisites
-
 - Node.js 18+
-- Modern browser with WebGL2 support
-- Webcam
+- Modern WebGL2-compatible browser (Chrome, Safari, Edge, Firefox)
+- Front-facing webcam (optional; Presentation Simulator mode available)
 
 ### Installation
-
 ```bash
 # Clone the repository
 git clone https://github.com/kunal0230/Real-Time-Gaze-Adaptive-LOD-Renderer.git
-cd Real-Time-Gaze-Adaptive-LOD-Renderer/foveated-renderer
+cd Real-Time-Gaze-Adaptive-LOD-Renderer
 
 # Install dependencies
-npm install
+npm install --prefix foveated-renderer
 
 # Start development server
 npm run dev
 ```
 
-### Usage
-
-1. **Open** `http://localhost:5173` in your browser
-2. **Allow** camera access when prompted
-3. **Position** your face within the guide oval
-4. **Click** "Start Calibration" when the button turns green
-5. **Complete** the 40-point calibration by looking at each dot
-6. **Explore** the 3D forest scene for 45 seconds
-7. **Review** analytics showing your compute savings
+Visit `http://localhost:5173` in your browser.
 
 ---
 
-## Project Structure
+## 6. Hosting on Vercel
+
+This repository is pre-configured for automated 1-click deployment on [Vercel](https://vercel.com):
+
+1. Push your repository to GitHub.
+2. Import the repository in the Vercel dashboard.
+3. Keep default settings (the included `vercel.json` and root `package.json` automatically manage the build command and output directory).
+4. Click **Deploy**.
+
+---
+
+## 7. Project Structure
 
 ```
-foveated-renderer/
-├── src/
-│   ├── main.js                     # Application orchestrator
-│   ├── screens/
-│   │   ├── HomeScreen.js           # Camera preview + instructions
-│   │   ├── DemoScreen.js           # 45-sec timed rendering demo
-│   │   └── ResultsScreen.js        # Analytics comparison
-│   ├── components/
-│   │   ├── FaceGuide.js            # Face positioning overlay
-│   │   └── DebugPanel.js           # Real-time stats visualization
-│   ├── analytics/
-│   │   └── ComputeTracker.js       # Performance metrics tracking
-│   ├── eye-tracking/
-│   │   ├── GazeEstimator.js        # MediaPipe integration
-│   │   └── RidgeRegression.js      # Gaze prediction model
-│   ├── calibration/
-│   │   └── CalibrationUI.js        # 40-point calibration
-│   ├── renderer/
-│   │   └── RaymarchingRenderer.js  # WebGL2 LOD shader
-│   └── utils/
-│       └── KalmanFilter.js         # Gaze smoothing
-├── index.html
-└── package.json
+.
+├── foveated-renderer/
+│   ├── index.html                   # Application entry markup
+│   ├── package.json                 # Core dependencies
+│   ├── src/
+│   │   ├── main.js                  # Application orchestrator
+│   │   ├── styles.css               # Scientific workstation styling
+│   │   ├── analytics/
+│   │   │   └── ComputeTracker.js    # Workload benchmarking & telemetry export
+│   │   ├── calibration/
+│   │   │   └── CalibrationUI.js     # Multi-protocol calibration & live verification
+│   │   ├── components/
+│   │   │   ├── DebugPanel.js        # Real-time telemetry & landmark inspector
+│   │   │   ├── FaceGuide.js         # Optical alignment guide overlay
+│   │   │   ├── SceneCard.js         # Environment selector card
+│   │   │   └── TutorialModal.js     # Research methodology guide
+│   │   ├── eye-tracking/
+│   │   │   ├── GazeEstimator.js     # 3D SO(3) normalization & IED extraction
+│   │   │   ├── OneEuroFilter.js     # Adaptive filter & saccade lead extrapolator
+│   │   │   ├── RidgeRegression.js   # Regularized least-squares solver & diagnostics
+│   │   │   └── constants.js         # MediaPipe landmark indices
+│   │   ├── renderer/
+│   │   │   └── SceneRenderer.js     # WebGL2 procedural raymarching engine
+│   │   └── scenes/
+│   │       ├── BaseScene.js         # Scene abstraction interface
+│   │       ├── ForestValley.js      # Procedural terrain with FBM & vegetation LOD
+│   │       ├── CosmicOrbs.js        # High-speed emissive sphere baseline (60 FPS)
+│   │       └── CrystalGrid.js       # Geometric crystal lattice with reflections
+├── package.json                     # Root monorepo scripts for Vercel
+├── vercel.json                      # Vercel deployment configuration
+├── brainstorm.md                    # Research trajectory & mathematical formulations
+└── tasks.md                         # Benchmark milestones & empirical observations
 ```
 
 ---
 
-## Performance Metrics
+## 8. License
 
-Based on actual demo sessions:
-
-| Metric | Value |
-|--------|-------|
-| **Target FPS** | 60 fps |
-| **Demo Duration** | 45 seconds |
-| **Full Render Cost** | 216,000 compute units |
-| **Selective Render Cost** | ~16,000-18,000 compute units |
-| **Average Savings** | 45-50% |
-| **Calibration Points** | 40 points (fullscreen grid) |
-| **Face Landmarks Tracked** | 468 points |
-
----
-
-## Technologies Used
-
-| Technology | Purpose |
-|------------|---------|
-| **WebGL2** | GPU-accelerated raymarching renderer |
-| **GLSL** | Procedural generation (trees, rocks, terrain, water) |
-| **MediaPipe Face Mesh** | 468-point facial landmark detection |
-| **Ridge Regression** | Eye-to-screen coordinate mapping |
-| **Kalman Filter** | Temporal gaze smoothing |
-| **Vite** | Fast development server & bundling |
-
----
-
-## Future Enhancements
-
-- Variable Resolution Rendering (VRR) integration
-- Multi-user calibration profiles
-- Mobile device support (iOS/Android)
-- WebXR support for VR headsets
-- Export analytics as shareable report
-- Side-by-side comparison mode
-
----
-
-## References
-
-- [Foveated Rendering - NVIDIA Research](https://research.nvidia.com/publication/2016-11_foveated-rendering)
-- [MediaPipe Face Mesh - Google](https://google.github.io/mediapipe/solutions/face_mesh.html)
-- [Variable Rate Shading - DirectX](https://docs.microsoft.com/en-us/windows/win32/direct3d12/vrs)
-- [Eye Tracking in VR - Meta Reality Labs](https://about.meta.com/realitylabs/)
-
----
-
-## License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-  <strong>Built for the intersection of Computer Vision and Real-time Graphics</strong>
-</p>
+MIT License. Developed for research and educational demonstrations in computer graphics, human-computer interaction, and foveated rendering.

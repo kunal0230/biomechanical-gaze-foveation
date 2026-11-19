@@ -1,0 +1,11 @@
+{
+  "name": "gaze-adaptive-lod-renderer",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Real-Time Gaze-Adaptive Level-of-Detail Renderer using WebGL2 Raymarching and Biomechanical Eye Tracking",
+  "scripts": {
+    "dev": "npm --prefix foveated-renderer run dev",
+    "build": "npm --prefix foveated-renderer run build",
+    "preview": "npm --prefix foveated-renderer run preview"
+  }
+}
