@@ -33,110 +33,112 @@ export class HomeScreen {
     _createLayout() {
         this.container.innerHTML = `
             <div class="home-screen">
-                <header class="home-header">
-                    <div class="header-title-block">
-                        <h1>Gaze-Adaptive Foveated Renderer</h1>
-                        <span class="header-sub">WebGL2 Raymarching & Biomechanical Oculomotor Benchmark</span>
+                <div class="home-workbench">
+                    <header class="home-header">
+                        <div class="header-title-block">
+                            <h1>Gaze-Adaptive Foveated Renderer</h1>
+                            <span class="header-sub">WebGL2 Raymarching & Biomechanical Oculomotor Benchmark</span>
+                        </div>
+                        <div class="header-meta">
+                            <span class="sys-badge" id="renderer-badge">WebGL2</span>
+                            <button class="sys-btn" id="tutorial-btn">Technical Notes</button>
+                        </div>
+                    </header>
+                    
+                    <div class="home-grid">
+                        <section class="controls-column">
+                            <!-- Mode Selector -->
+                            <div class="panel-box">
+                                <label class="box-label">Input Mode</label>
+                                <div class="mode-toggle">
+                                    <button class="mode-btn active" id="mode-camera-btn">Webcam Eye Tracker</button>
+                                    <button class="mode-btn" id="mode-sim-btn">Demo Simulation</button>
+                                </div>
+                            </div>
+
+                            <!-- Environment Selector -->
+                            <div class="panel-box">
+                                <label class="box-label">Test Environment</label>
+                                <div class="scene-list" id="scene-grid"></div>
+                            </div>
+
+                            <!-- Technical Parameter Summary -->
+                            <div class="panel-box tech-specs">
+                                <label class="box-label">Pipeline Parameters</label>
+                                <div class="specs-grid">
+                                    <div class="spec-row">
+                                        <span class="spec-k">Foveal Step Budget:</span>
+                                        <span class="spec-v">64 steps / ray</span>
+                                    </div>
+                                    <div class="spec-row">
+                                        <span class="spec-k">Peripheral Step Budget:</span>
+                                        <span class="spec-v">20 steps / ray</span>
+                                    </div>
+                                    <div class="spec-row">
+                                        <span class="spec-k">Head Pose Decoupling:</span>
+                                        <span class="spec-v">3D SO(3) Canonical</span>
+                                    </div>
+                                    <div class="spec-row">
+                                        <span class="spec-k">Temporal Filter:</span>
+                                        <span class="spec-v">1-Euro Adaptive (fc=0.9 Hz)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Launch Actions -->
+                            <div class="action-footer">
+                                <div class="sensor-status-line" id="camera-status">
+                                    <span class="status-indicator" id="status-ind"></span>
+                                    <span class="status-msg" id="status-msg">Initializing camera...</span>
+                                </div>
+                                <div class="action-row">
+                                    <button class="btn primary" id="start-btn" disabled>Start Calibration</button>
+                                    <button class="btn secondary" id="preset-btn">Skip to Demo</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="viewport-column">
+                            <div class="camera-panel" id="camera-preview">
+                                <video id="home-video" autoplay playsinline muted></video>
+                                
+                                <div class="camera-loader">
+                                    <div class="loader-line"></div>
+                                    <span>Awaiting video stream...</span>
+                                </div>
+
+                                <div class="camera-telemetry">
+                                    <span class="tel-item" id="stat-resolution">1280x720</span>
+                                    <span class="tel-item" id="stat-confidence">Sensor Ready</span>
+                                    <span class="tel-item" id="stat-fps">-- FPS</span>
+                                </div>
+                            </div>
+
+                            <div class="sim-panel" id="sim-panel" style="display:none;">
+                                <div class="sim-panel-content">
+                                    <h3>Demo Simulation Active</h3>
+                                    <p>Pointer and touch movement directly drive the gaze fixation point with simulated saccadic dynamics and 1-Euro adaptive smoothing.</p>
+                                    <div class="sim-note">Direct hardware evaluation without requiring camera permissions or calibration.</div>
+                                    <button class="btn primary" id="sim-launch-btn">Run Demo Simulation</button>
+                                </div>
+                            </div>
+
+                            <div class="posture-guide">
+                                <div class="guide-item">
+                                    <span class="guide-marker">•</span>
+                                    <span>Subject distance: 50–65 cm</span>
+                                </div>
+                                <div class="guide-item">
+                                    <span class="guide-marker">•</span>
+                                    <span>Direct frontal orientation</span>
+                                </div>
+                                <div class="guide-item">
+                                    <span class="guide-marker">•</span>
+                                    <span>Stable ambient illumination</span>
+                                </div>
+                            </div>
+                        </section>
                     </div>
-                    <div class="header-meta">
-                        <span class="sys-badge" id="renderer-badge">WebGL2</span>
-                        <button class="sys-btn" id="tutorial-btn">Technical Notes</button>
-                    </div>
-                </header>
-                
-                <div class="home-grid">
-                    <section class="controls-column">
-                        <!-- Mode Selector -->
-                        <div class="panel-box">
-                            <label class="box-label">Input Mode</label>
-                            <div class="mode-toggle">
-                                <button class="mode-btn active" id="mode-camera-btn">Webcam Eye Tracker</button>
-                                <button class="mode-btn" id="mode-sim-btn">Demo Simulation</button>
-                            </div>
-                        </div>
-
-                        <!-- Environment Selector -->
-                        <div class="panel-box">
-                            <label class="box-label">Test Environment</label>
-                            <div class="scene-list" id="scene-grid"></div>
-                        </div>
-
-                        <!-- Technical Parameter Summary -->
-                        <div class="panel-box tech-specs">
-                            <label class="box-label">Pipeline Parameters</label>
-                            <div class="specs-grid">
-                                <div class="spec-row">
-                                    <span class="spec-k">Foveal Step Budget:</span>
-                                    <span class="spec-v">64 steps / ray</span>
-                                </div>
-                                <div class="spec-row">
-                                    <span class="spec-k">Peripheral Step Budget:</span>
-                                    <span class="spec-v">20 steps / ray</span>
-                                </div>
-                                <div class="spec-row">
-                                    <span class="spec-k">Head Pose Decoupling:</span>
-                                    <span class="spec-v">3D SO(3) Canonical</span>
-                                </div>
-                                <div class="spec-row">
-                                    <span class="spec-k">Temporal Filter:</span>
-                                    <span class="spec-v">1-Euro Adaptive (fc=0.9 Hz)</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Launch Actions -->
-                        <div class="action-footer">
-                            <div class="sensor-status-line" id="camera-status">
-                                <span class="status-indicator" id="status-ind"></span>
-                                <span class="status-msg" id="status-msg">Initializing camera...</span>
-                            </div>
-                            <div class="action-row">
-                                <button class="btn primary" id="start-btn" disabled>Start Calibration</button>
-                                <button class="btn secondary" id="preset-btn">Skip to Demo</button>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="viewport-column">
-                        <div class="camera-panel" id="camera-preview">
-                            <video id="home-video" autoplay playsinline muted></video>
-                            
-                            <div class="camera-loader">
-                                <div class="loader-line"></div>
-                                <span>Awaiting video stream...</span>
-                            </div>
-
-                            <div class="camera-telemetry">
-                                <span class="tel-item" id="stat-resolution">1280x720</span>
-                                <span class="tel-item" id="stat-fps">-- FPS</span>
-                                <span class="tel-item" id="stat-confidence">Sensor Ready</span>
-                            </div>
-                        </div>
-
-                        <div class="sim-panel" id="sim-panel" style="display:none;">
-                            <div class="sim-panel-content">
-                                <h3>Demo Simulation Active</h3>
-                                <p>Pointer and touch movement directly drive the gaze fixation point with simulated saccadic dynamics and 1-Euro adaptive smoothing.</p>
-                                <div class="sim-note">Direct hardware evaluation without requiring camera permissions or calibration.</div>
-                                <button class="btn primary" id="sim-launch-btn">Run Demo Simulation</button>
-                            </div>
-                        </div>
-
-                        <div class="posture-guide">
-                            <div class="guide-item">
-                                <span class="guide-marker">•</span>
-                                <span>Subject distance: 50–65 cm</span>
-                            </div>
-                            <div class="guide-item">
-                                <span class="guide-marker">•</span>
-                                <span>Direct frontal orientation</span>
-                            </div>
-                            <div class="guide-item">
-                                <span class="guide-marker">•</span>
-                                <span>Stable ambient illumination</span>
-                            </div>
-                        </div>
-                    </section>
                 </div>
             </div>
         `;
@@ -262,7 +264,7 @@ export class HomeScreen {
         this.startBtn.disabled = !ready;
 
         if (this.statConfidence) {
-            this.statConfidence.textContent = detected ? (ready ? 'Subject Aligned' : 'Acquiring') : 'Searching';
+            this.statConfidence.textContent = detected ? (ready ? 'Aligned' : 'Acquiring') : 'Searching';
         }
 
         if (ready) {

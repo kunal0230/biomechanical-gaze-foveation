@@ -1,5 +1,6 @@
 /**
  * FaceGuide - Minimalist Technical Alignment Reticle
+ * Draws a natural human face alignment oval and subtle target crosshairs.
  */
 
 export class FaceGuide {
@@ -10,7 +11,7 @@ export class FaceGuide {
         this.faceDetected = false;
         this.facePosition = { x: 0.5, y: 0.5, size: 0 };
         this.status = 'searching';
-        this.statusText = 'Searching for face...';
+        this.statusText = 'Searching...';
 
         this._createCanvas();
     }
@@ -90,10 +91,11 @@ export class FaceGuide {
         const h = this.canvas.height;
         ctx.clearRect(0, 0, w, h);
 
+        // Anatomically proportional human face oval (width : height ≈ 0.72)
+        const ovalCenterY = h * 0.48;
         const ovalCenterX = w * 0.5;
-        const ovalCenterY = h * 0.44;
-        const ovalRadiusX = w * 0.22;
-        const ovalRadiusY = h * 0.32;
+        const ovalRadiusY = Math.min(h * 0.38, 140);
+        const ovalRadiusX = Math.round(ovalRadiusY * 0.72);
 
         let guideColor = '#cf222e'; // red
         if (this.status === 'good') guideColor = '#1a7f37'; // green
@@ -101,7 +103,7 @@ export class FaceGuide {
         else if (this.status === 'searching') guideColor = '#6e7781'; // gray
 
         // Subdued light vignette outside oval
-        ctx.fillStyle = 'rgba(246, 248, 250, 0.4)';
+        ctx.fillStyle = 'rgba(246, 248, 250, 0.35)';
         ctx.fillRect(0, 0, w, h);
 
         ctx.save();
@@ -113,23 +115,23 @@ export class FaceGuide {
 
         // 1px oval line
         ctx.strokeStyle = guideColor;
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1.4;
         ctx.beginPath();
         ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, Math.PI * 2);
         ctx.stroke();
 
         // 1px horizontal eye axis line
-        const eyeLineY = ovalCenterY - ovalRadiusY * 0.15;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        const eyeLineY = ovalCenterY - ovalRadiusY * 0.18;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(ovalCenterX - ovalRadiusX * 0.6, eyeLineY);
-        ctx.lineTo(ovalCenterX + ovalRadiusX * 0.6, eyeLineY);
+        ctx.moveTo(ovalCenterX - ovalRadiusX * 0.65, eyeLineY);
+        ctx.lineTo(ovalCenterX + ovalRadiusX * 0.65, eyeLineY);
         ctx.stroke();
 
         // Corner crosshairs
         const cLen = 12;
-        const pad = 16;
+        const pad = 14;
         ctx.strokeStyle = guideColor;
         ctx.lineWidth = 1.5;
 
@@ -160,12 +162,6 @@ export class FaceGuide {
         ctx.lineTo(w - pad, h - pad);
         ctx.lineTo(w - pad, h - pad - cLen);
         ctx.stroke();
-
-        // Status text
-        ctx.font = '500 12px ui-monospace, Menlo, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = guideColor;
-        ctx.fillText(this.statusText, w / 2, h - 16);
     }
 
     isReady() {
