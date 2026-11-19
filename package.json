@@ -1,12 +1,18 @@
 {
-  "name": "gaze-adaptive-lod-renderer",
-  "version": "2.0.0",
+  "name": "foveated-renderer",
   "private": true,
-  "description": "Real-Time Gaze-Adaptive Level-of-Detail Renderer using WebGL2 Raymarching and Biomechanical Eye Tracking",
+  "version": "1.2.2",
+  "type": "module",
   "scripts": {
-    "dev": "npm --prefix foveated-renderer run dev",
-    "build": "npm --prefix foveated-renderer run build",
-    "preview": "npm --prefix foveated-renderer run preview"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@mediapipe/face_mesh": "^0.4.1633559619",
+    "@mediapipe/camera_utils": "^0.3.1640029074"
   }
 }
-
