@@ -1,6 +1,5 @@
 /**
- * FaceGuide - Optical Alignment & Facial Posture Verification Overlay
- * Guides subject to position head for optimal pupil & eyelid landmark detection
+ * FaceGuide - Minimalist Technical Alignment Reticle
  */
 
 export class FaceGuide {
@@ -10,8 +9,8 @@ export class FaceGuide {
         this.ctx = null;
         this.faceDetected = false;
         this.facePosition = { x: 0.5, y: 0.5, size: 0 };
-        this.status = 'searching'; // 'searching' | 'too_far' | 'too_close' | 'off_center' | 'good'
-        this.statusText = 'Acquiring facial landmarks...';
+        this.status = 'searching';
+        this.statusText = 'Searching for face...';
 
         this._createCanvas();
     }
@@ -37,7 +36,7 @@ export class FaceGuide {
         if (!landmarks || landmarks.length === 0) {
             this.faceDetected = false;
             this.status = 'searching';
-            this.statusText = 'Acquiring facial landmarks...';
+            this.statusText = 'Searching...';
             return;
         }
 
@@ -67,16 +66,16 @@ export class FaceGuide {
 
         if (faceSize < idealSize - sizeTolerance) {
             this.status = 'too_far';
-            this.statusText = 'Move closer to sensor (ideal: 50-65 cm)';
+            this.statusText = 'Move closer (50–65 cm)';
         } else if (faceSize > idealSize + sizeTolerance + 0.1) {
             this.status = 'too_close';
-            this.statusText = 'Move slightly back from sensor';
+            this.statusText = 'Move slightly back';
         } else if (offCenterX > centerTolerance || offCenterY > centerTolerance) {
             this.status = 'off_center';
-            this.statusText = 'Center face within alignment reticle';
+            this.statusText = 'Center face in frame';
         } else {
             this.status = 'good';
-            this.statusText = 'Optimal alignment. Ready for calibration';
+            this.statusText = 'Face aligned';
         }
     }
 
@@ -96,23 +95,15 @@ export class FaceGuide {
         const ovalRadiusX = w * 0.22;
         const ovalRadiusY = h * 0.32;
 
-        let guideColor = '#ef4444'; // Red
-        let bgAlpha = 0.35;
+        let guideColor = '#e5534b'; // red
+        if (this.status === 'good') guideColor = '#57ab5a'; // green
+        else if (this.status === 'off_center') guideColor = '#d29922'; // yellow
+        else if (this.status === 'searching') guideColor = '#768390'; // gray
 
-        if (this.status === 'good') {
-            guideColor = '#10b981'; // Emerald
-            bgAlpha = 0.20;
-        } else if (this.status === 'off_center') {
-            guideColor = '#f59e0b'; // Amber
-        } else if (this.status === 'searching') {
-            guideColor = '#06b6d4'; // Cyan
-        }
-
-        // Darken periphery
-        ctx.fillStyle = `rgba(10, 14, 23, ${bgAlpha})`;
+        // Subdued vignette outside oval
+        ctx.fillStyle = 'rgba(13, 17, 23, 0.4)';
         ctx.fillRect(0, 0, w, h);
 
-        // Punch out oval
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';
         ctx.beginPath();
@@ -120,31 +111,27 @@ export class FaceGuide {
         ctx.fill();
         ctx.restore();
 
-        // Oval stroke
+        // 1px oval line
         ctx.strokeStyle = guideColor;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 6]);
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.setLineDash([]);
 
-        // Horizontal Eye Axis Guide
+        // 1px horizontal eye axis line
         const eyeLineY = ovalCenterY - ovalRadiusY * 0.15;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        ctx.moveTo(ovalCenterX - ovalRadiusX * 0.7, eyeLineY);
-        ctx.lineTo(ovalCenterX + ovalRadiusX * 0.7, eyeLineY);
+        ctx.moveTo(ovalCenterX - ovalRadiusX * 0.6, eyeLineY);
+        ctx.lineTo(ovalCenterX + ovalRadiusX * 0.6, eyeLineY);
         ctx.stroke();
-        ctx.setLineDash([]);
 
-        // Precision corner marks
-        const cLen = 16;
-        const pad = 20;
+        // Corner crosshairs
+        const cLen = 12;
+        const pad = 16;
         ctx.strokeStyle = guideColor;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
 
         // TL
         ctx.beginPath();
@@ -175,20 +162,10 @@ export class FaceGuide {
         ctx.stroke();
 
         // Status text
-        ctx.font = '600 13px Inter, system-ui, sans-serif';
+        ctx.font = '500 12px ui-monospace, Menlo, monospace';
         ctx.textAlign = 'center';
         ctx.fillStyle = guideColor;
-        ctx.fillText(this.statusText, w / 2, h - 22);
-
-        // Center dot
-        if (this.faceDetected) {
-            const faceX = this.facePosition.x * w;
-            const faceY = this.facePosition.y * h;
-            ctx.beginPath();
-            ctx.arc(faceX, faceY, 4, 0, Math.PI * 2);
-            ctx.fillStyle = guideColor;
-            ctx.fill();
-        }
+        ctx.fillText(this.statusText, w / 2, h - 16);
     }
 
     isReady() {

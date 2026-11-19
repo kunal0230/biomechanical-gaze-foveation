@@ -1,6 +1,5 @@
 /**
- * TutorialModal - Research Methodology & System Architecture Guide
- * Explains physiological foveation, biomechanical tracking, and WebGL2 LOD architecture
+ * TutorialModal - Concise Technical Reference Notes
  */
 
 export class TutorialModal {
@@ -11,24 +10,24 @@ export class TutorialModal {
 
         this.steps = [
             {
-                stepNum: '01',
-                title: 'Physiological Principle: Foveated Vision',
-                content: 'The human retina exhibits non-uniform receptor distribution. The central fovea (1.5°–2.0° visual angle) contains dense cone photoreceptors for high-acuity vision, while the peripheral retina contains sparse rods with low spatial resolution. Foveated rendering concentrates GPU raymarching workloads exclusively on the point of gaze, dynamically throttling peripheral geometric complexity.'
+                tag: 'FOVEATED LOD',
+                title: 'Raymarching Step Throttling',
+                content: 'Ray steps scale continuously from 64 in the fovea centralis (< 2° visual angle) to 20 in the periphery. Surface distance epsilon relaxes from 0.005 to 0.040, and terrain FBM octaves reduce from 4 to 2, yielding ~50% shader compute savings.'
             },
             {
-                stepNum: '02',
-                title: 'Biomechanical Gaze Tracking & SO(3) Decoupling',
-                content: 'Commodity RGB webcam tracking suffers from upper eyelid occlusion (ptosis) during downward gaze and false gaze shifts caused by head tilt. This system projects facial landmarks into a head-canonical 3D SO(3) frame centered at the pronasale (nose tip) and computes the Iris-to-Eyebrow Distance (IED) as an occlusion-free vertical gaze proxy, paired with the Bilateral Scleral Ratio for scale-invariant horizontal tracking.'
+                tag: 'BIOMECHANICS',
+                title: 'SO(3) Decoupling & IED Vertical Proxy',
+                content: 'Facial landmarks are projected into a 3D skull-canonical frame centered at the nose tip (landmark 4), neutralizing head pitch. The Iris-to-Eyebrow Distance (IED) provides an occlusion-free vertical gaze proxy, bypassing downward eyelid ptosis.'
             },
             {
-                stepNum: '03',
-                title: 'Adaptive 1-Euro Filter & Saccade Lead',
-                content: 'Human eye movements alternate between static fixations and rapid ballistic saccades (>300°/s). A dual-state 1-Euro filter eliminates micro-jitter during steady fixation (cutoff ~0.9 Hz) while scaling responsiveness during saccades. To compensate for the ~40ms webcam pipeline latency, constant-velocity ballistic extrapolation projects the foveal circle forward to prevent visual lag.'
+                tag: 'TEMPORAL FILTER',
+                title: 'Dual-State 1-Euro & Saccade Lead',
+                content: 'Low-frequency micro-jitter is filtered during steady fixation (fc = 0.9 Hz). During saccades (> 150°/s), filter cutoff scales dynamically and forward-projects coordinates by 40 ms to compensate for webcam capture latency.'
             },
             {
-                stepNum: '04',
-                title: 'WebGL2 Raymarching Level-of-Detail',
-                content: 'Within the shader, distance from the normalized gaze point determines raymarching step bounds (64 steps in the fovea down to 20 in the periphery), procedural fractal Brownian motion (FBM) octaves (4 down to 2), and surface intersection epsilon tolerances. This delivers an empirical 45%–60% reduction in total compute workload while preserving perceived visual fidelity.'
+                tag: 'BENCHMARK',
+                title: 'Compute Unit Evaluation',
+                content: 'Session analytics compare uniform 64-step baseline raymarching against selective foveated raymarching, measuring total compute units and frame step variance.'
             }
         ];
 
@@ -39,43 +38,42 @@ export class TutorialModal {
         this.overlay = document.createElement('div');
         this.overlay.className = 'tutorial-overlay hidden';
         this.overlay.innerHTML = `
-            <div class="tutorial-modal">
-                <div class="tutorial-header">
-                    <div class="tutorial-step-tag">PROTOCOL DOCUMENTATION</div>
-                    <button class="tutorial-close" aria-label="Close">&times;</button>
+            <div class="tech-modal-box">
+                <div class="tech-modal-header">
+                    <span class="modal-label" id="doc-tag">TECHNICAL REFERENCE</span>
+                    <button class="close-x" aria-label="Close">&times;</button>
                 </div>
-                <div class="tutorial-step-num"></div>
-                <h2 class="tutorial-title"></h2>
-                <p class="tutorial-content"></p>
-                <div class="tutorial-progress">
-                    <div class="tutorial-dots"></div>
-                </div>
-                <div class="tutorial-actions">
-                    <button class="tutorial-prev cal-btn secondary">Previous</button>
-                    <button class="tutorial-next cal-btn primary">Next</button>
+                <h3 class="doc-title" id="doc-title"></h3>
+                <p class="doc-body" id="doc-body"></p>
+                <div class="modal-footer">
+                    <div class="tab-indicators" id="tab-indicators"></div>
+                    <div class="modal-btn-row">
+                        <button class="sys-btn" id="doc-prev">Previous</button>
+                        <button class="btn primary small" id="doc-next">Next</button>
+                    </div>
                 </div>
             </div>
         `;
 
         document.body.appendChild(this.overlay);
 
-        this.overlay.querySelector('.tutorial-close').addEventListener('click', () => this.hide());
-        this.overlay.querySelector('.tutorial-prev').addEventListener('click', () => this._prevStep());
-        this.overlay.querySelector('.tutorial-next').addEventListener('click', () => this._nextStep());
+        this.overlay.querySelector('.close-x').addEventListener('click', () => this.hide());
+        this.overlay.querySelector('#doc-prev').addEventListener('click', () => this._prevStep());
+        this.overlay.querySelector('#doc-next').addEventListener('click', () => this._nextStep());
         this.overlay.addEventListener('click', (e) => {
             if (e.target === this.overlay) this.hide();
         });
 
-        this._renderDots();
+        this._renderTabs();
     }
 
-    _renderDots() {
-        const dotsContainer = this.overlay.querySelector('.tutorial-dots');
-        dotsContainer.innerHTML = this.steps.map((_, i) =>
-            `<span class="tutorial-dot ${i === this.currentStep ? 'active' : ''}" data-step="${i}"></span>`
+    _renderTabs() {
+        const container = this.overlay.querySelector('#tab-indicators');
+        container.innerHTML = this.steps.map((_, i) =>
+            `<span class="tab-dot ${i === this.currentStep ? 'active' : ''}" data-step="${i}"></span>`
         ).join('');
 
-        dotsContainer.querySelectorAll('.tutorial-dot').forEach(dot => {
+        container.querySelectorAll('.tab-dot').forEach(dot => {
             dot.addEventListener('click', () => {
                 this.currentStep = parseInt(dot.dataset.step, 10);
                 this._updateContent();
@@ -86,19 +84,19 @@ export class TutorialModal {
     _updateContent() {
         const step = this.steps[this.currentStep];
 
-        this.overlay.querySelector('.tutorial-step-num').textContent = `Section ${step.stepNum} of 04`;
-        this.overlay.querySelector('.tutorial-title').textContent = step.title;
-        this.overlay.querySelector('.tutorial-content').textContent = step.content;
+        this.overlay.querySelector('#doc-tag').textContent = `NOTE ${this.currentStep + 1}/4: ${step.tag}`;
+        this.overlay.querySelector('#doc-title').textContent = step.title;
+        this.overlay.querySelector('#doc-body').textContent = step.content;
 
-        this.overlay.querySelectorAll('.tutorial-dot').forEach((dot, i) => {
+        this.overlay.querySelectorAll('.tab-dot').forEach((dot, i) => {
             dot.classList.toggle('active', i === this.currentStep);
         });
 
-        const prevBtn = this.overlay.querySelector('.tutorial-prev');
-        const nextBtn = this.overlay.querySelector('.tutorial-next');
+        const prevBtn = this.overlay.querySelector('#doc-prev');
+        const nextBtn = this.overlay.querySelector('#doc-next');
 
         prevBtn.style.visibility = this.currentStep === 0 ? 'hidden' : 'visible';
-        nextBtn.textContent = this.currentStep === this.steps.length - 1 ? 'Close Guide' : 'Next Section';
+        nextBtn.textContent = this.currentStep === this.steps.length - 1 ? 'Close' : 'Next';
     }
 
     _prevStep() {

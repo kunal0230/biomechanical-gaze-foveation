@@ -63,9 +63,9 @@ $$\mathbf{p}_{\text{rendered}} = \mathbf{p} + \mathbf{v} \cdot \tau_{\text{lead}
 - **Interactive Calibration Verification**:
   - Displays Mean Absolute Error (MAE in pixels and visual degrees) and $R^2$ fit scores.
   - Live interactive reticle test to confirm tracking accuracy prior to simulation.
-- **Presentation Simulator Mode**:
+- **Demo Simulation Mode**:
   - Direct cursor or touch foveation with natural saccadic velocity dynamics.
-  - Enables flawless live stage demonstrations on machines without webcam hardware or in low-light auditoriums.
+  - Enables visual evaluation on devices without webcam hardware or in low-light auditoriums.
 - **Visual Reticle Rings Overlay**:
   - Visualizes biological $2^\circ$ fovea centralis and $5^\circ$ parafoveal boundaries.
 - **Compute Heatmap Mode**:
@@ -80,7 +80,7 @@ $$\mathbf{p}_{\text{rendered}} = \mathbf{p} + \mathbf{v} \cdot \tau_{\text{lead}
 ### Prerequisites
 - Node.js 18+
 - Modern WebGL2-compatible browser (Chrome, Safari, Edge, Firefox)
-- Front-facing webcam (optional; Presentation Simulator mode available)
+- Front-facing webcam (optional; Demo Simulation mode available)
 
 ### Installation
 ```bash

@@ -1,6 +1,6 @@
 /**
  * ResultsScreen - Research Session Analytics Dashboard
- * Quantitative workload reduction evaluation, step distribution histogram, and telemetry export
+ * Clean, structured scientific report comparing baseline vs selective compute costs
  */
 
 export class ResultsScreen {
@@ -16,128 +16,76 @@ export class ResultsScreen {
         this.container.innerHTML = `
             <div class="results-screen">
                 <header class="results-header">
-                    <div class="results-header-tag">QUANTITATIVE BENCHMARK REPORT</div>
-                    <h1>Rendering Workload & Efficiency Analytics</h1>
-                    <p class="subtitle">Empirical performance comparison of uniform full render vs gaze-adaptive foveated render</p>
+                    <h2>Session Performance Analysis</h2>
+                    <span class="sub-label">Uniform Raymarching Baseline vs Gaze-Adaptive LOD Evaluation</span>
                 </header>
                 
-                <div class="results-content">
-                    <!-- Top Workload Comparison Cards -->
-                    <div class="comparison-section">
-                        <div class="cost-card full-render">
-                            <div class="card-metric-badge">UNIFORM BASELINE</div>
-                            <div class="cost-header-row">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                                    <line x1="8" y1="21" x2="16" y2="21"></line>
-                                    <line x1="12" y1="17" x2="12" y2="21"></line>
-                                </svg>
-                                <h3>Full Quality Baseline</h3>
-                            </div>
-                            <p class="cost-description">Static uniform raymarching (64 steps / ray everywhere)</p>
-                            <div class="cost-value" id="full-render-cost">--</div>
-                            <div class="cost-unit">compute units (ray-steps)</div>
-                            <div class="cost-details">
-                                <span id="full-render-steps">64</span> steps &times; <span id="full-render-frames">2,700</span> frames
+                <div class="results-layout">
+                    <!-- Metrics Comparison Grid -->
+                    <div class="metrics-grid">
+                        <div class="metric-panel">
+                            <span class="panel-tag">BASELINE (UNIFORM)</span>
+                            <div class="metric-main" id="full-render-cost">--</div>
+                            <span class="metric-unit">Compute Units</span>
+                            <div class="metric-detail">
+                                <span id="full-render-steps">64</span> steps/ray &times; <span id="full-render-frames">2,700</span> frames
                             </div>
                         </div>
                         
-                        <div class="vs-indicator">
-                            <span>VS</span>
-                        </div>
-                        
-                        <div class="cost-card selective-render">
-                            <div class="card-metric-badge highlight">GAZE-ADAPTIVE</div>
-                            <div class="cost-header-row">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <h3>Foveated Selective Render</h3>
-                            </div>
-                            <p class="cost-description">Dynamic LOD driven by real-time eye tracking</p>
-                            <div class="cost-value" id="selective-render-cost">--</div>
-                            <div class="cost-unit">compute units (ray-steps)</div>
-                            <div class="cost-details">
-                                Avg <span id="selective-avg-steps">--</span> steps &times; <span id="selective-frames">--</span> frames
+                        <div class="metric-panel foveated">
+                            <span class="panel-tag highlight">GAZE-ADAPTIVE (LOD)</span>
+                            <div class="metric-main highlight" id="selective-render-cost">--</div>
+                            <span class="metric-unit">Compute Units</span>
+                            <div class="metric-detail">
+                                Avg <span id="selective-avg-steps">--</span> steps/ray &times; <span id="selective-frames">--</span> frames
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Compute Savings Summary Banner -->
-                    <div class="savings-section">
-                        <div class="savings-header-row">
-                            <div class="savings-title-group">
-                                <h3>GPU Workload Reduction</h3>
-                                <span class="savings-subtitle">Theoretical shader ALU & memory bandwidth reduction</span>
+
+                        <div class="metric-panel savings">
+                            <span class="panel-tag">WORKLOAD REDUCTION</span>
+                            <div class="metric-main green" id="savings-percentage">0%</div>
+                            <span class="metric-unit">Shader ALU & Raymarch Savings</span>
+                            <div class="savings-meter">
+                                <div class="savings-fill" id="savings-bar"></div>
                             </div>
-                            <div class="savings-percentage" id="savings-percentage">0%</div>
                         </div>
-                        <div class="savings-bar-container">
-                            <div class="savings-bar" id="savings-bar"></div>
-                        </div>
-                        <p class="savings-description" id="savings-description">
-                            By concentrating raymarching step density on the fovea centralis and throttling peripheral octaves, 
-                            the system achieved an empirical <strong id="savings-value">0%</strong> compute workload reduction.
-                        </p>
                     </div>
 
-                    <!-- Step Trajectory Chart Section -->
-                    <div class="chart-section" id="chart-section">
+                    <!-- Step Trajectory Plot -->
+                    <div class="chart-box">
                         <div class="chart-header">
-                            <h4>Raymarching Step Budget Over Time</h4>
-                            <span class="chart-legend">Baseline (64) vs Dynamic Adaptive Steps</span>
+                            <span class="chart-title">Raymarching Step Budget Over Time (s)</span>
+                            <span class="chart-legend">Baseline: 64 steps (dashed) | Measured: Solid</span>
                         </div>
-                        <div class="chart-container" id="svg-chart-container">
-                            <!-- SVG Chart injected dynamically -->
+                        <div class="chart-svg-container" id="svg-chart-container"></div>
+                    </div>
+                    
+                    <!-- Session Diagnostics Table -->
+                    <div class="diagnostics-table">
+                        <div class="diag-cell">
+                            <span class="diag-k">Session Duration:</span>
+                            <span class="diag-v" id="session-duration">45s</span>
+                        </div>
+                        <div class="diag-cell">
+                            <span class="diag-k">Total Frames:</span>
+                            <span class="diag-v" id="frames-captured">--</span>
+                        </div>
+                        <div class="diag-cell">
+                            <span class="diag-k">Mean Framerate:</span>
+                            <span class="diag-v" id="avg-fps">--</span>
+                        </div>
+                        <div class="diag-cell">
+                            <span class="diag-k">Mean Ray Steps:</span>
+                            <span class="diag-v" id="avg-step-density">--</span>
                         </div>
                     </div>
                     
-                    <!-- Session Metrics Table -->
-                    <div class="session-details">
-                        <h4>Session Diagnostics & Parameters</h4>
-                        <div class="details-grid">
-                            <div class="detail-item">
-                                <span class="detail-label">Session Duration</span>
-                                <span class="detail-value" id="session-duration">45s</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Frames Evaluated</span>
-                                <span class="detail-value" id="frames-captured">--</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Average Framerate</span>
-                                <span class="detail-value" id="avg-fps">--</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Average Step Density</span>
-                                <span class="detail-value" id="avg-step-density">--</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="action-buttons">
-                        <button class="cal-btn secondary" id="export-json-btn">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            Export Telemetry (JSON)
-                        </button>
-                        <button class="cal-btn primary" id="try-again-btn">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="1 4 1 10 7 10"></polyline>
-                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                            </svg>
-                            Run New Benchmark Session
-                        </button>
+                    <!-- Actions -->
+                    <div class="results-actions">
+                        <button class="sys-btn" id="export-json-btn">Export Data (JSON)</button>
+                        <button class="btn primary" id="try-again-btn">Run New Session</button>
                     </div>
                 </div>
-                
-                <footer class="results-footer">
-                    <p>Quantitative benchmark methodology adheres to human visual acuity falloff models for VR/AR and WebGL rasterization</p>
-                </footer>
             </div>
         `;
 
@@ -149,7 +97,6 @@ export class ResultsScreen {
         this.selectiveFrames = document.getElementById('selective-frames');
         this.savingsBar = document.getElementById('savings-bar');
         this.savingsPercentage = document.getElementById('savings-percentage');
-        this.savingsValue = document.getElementById('savings-value');
         this.sessionDuration = document.getElementById('session-duration');
         this.framesCaptured = document.getElementById('frames-captured');
         this.avgFps = document.getElementById('avg-fps');
@@ -192,14 +139,12 @@ export class ResultsScreen {
         const savingsClamp = Math.max(0, Math.min(100, Math.round(savings * 10) / 10));
         this.savingsBar.style.width = `${savingsClamp}%`;
         this.savingsPercentage.textContent = `${savingsClamp}%`;
-        this.savingsValue.textContent = `${savingsClamp}%`;
 
         this.sessionDuration.textContent = `${durationSec}s`;
         this.framesCaptured.textContent = totalFrames.toLocaleString();
         this.avgFps.textContent = `${avgFpsVal} FPS`;
-        this.avgStepDensity.textContent = `${selAvgSteps} / ${fullSteps} steps`;
+        this.avgStepDensity.textContent = `${selAvgSteps} / ${fullSteps}`;
 
-        // Render Step Trajectory SVG Chart
         this._renderStepChart(summary.timeSeries || []);
     }
 
@@ -207,14 +152,14 @@ export class ResultsScreen {
         if (!this.chartContainer) return;
 
         if (!timeSeries || timeSeries.length < 2) {
-            this.chartContainer.innerHTML = `<p class="chart-empty-msg">Insufficient time-series data captured for graphing</p>`;
+            this.chartContainer.innerHTML = `<span class="chart-empty">Insufficient samples captured</span>`;
             return;
         }
 
-        const width = 680;
-        const height = 140;
-        const padX = 40;
-        const padY = 20;
+        const width = 640;
+        const height = 120;
+        const padX = 35;
+        const padY = 15;
         const graphW = width - 2 * padX;
         const graphH = height - 2 * padY;
 
@@ -224,7 +169,6 @@ export class ResultsScreen {
 
         const baselineY = padY + graphH * (1.0 - 64 / 70);
 
-        // Build path points
         const points = timeSeries.map(pt => {
             const x = padX + ((pt.t - minT) / spanT) * graphW;
             const y = padY + graphH * (1.0 - Math.min(70, pt.steps) / 70);
@@ -232,30 +176,23 @@ export class ResultsScreen {
         });
 
         const polylineStr = points.join(' ');
-        const firstPoint = points[0].split(',');
-        const lastPoint = points[points.length - 1].split(',');
-        const areaStr = `${points.join(' ')} ${lastPoint[0]},${padY + graphH} ${firstPoint[0]},${padY + graphH}`;
 
         this.chartContainer.innerHTML = `
-            <svg viewBox="0 0 ${width} ${height}" class="step-chart-svg">
-                <!-- Grid Lines -->
-                <line x1="${padX}" y1="${padY}" x2="${padX + graphW}" y2="${padY}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,3"/>
-                <line x1="${padX}" y1="${padY + graphH * 0.5}" x2="${padX + graphW}" y2="${padY + graphH * 0.5}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,3"/>
-                <line x1="${padX}" y1="${padY + graphH}" x2="${padX + graphW}" y2="${padY + graphH}" stroke="rgba(255,255,255,0.15)"/>
+            <svg viewBox="0 0 ${width} ${height}" class="chart-svg">
+                <!-- Axes -->
+                <line x1="${padX}" y1="${padY + graphH}" x2="${padX + graphW}" y2="${padY + graphH}" stroke="#353b45"/>
+                <line x1="${padX}" y1="${padY}" x2="${padX}" y2="${padY + graphH}" stroke="#353b45"/>
 
-                <!-- Y Axis Labels -->
-                <text x="${padX - 8}" y="${padY + 4}" fill="#64748b" font-size="10" text-anchor="end" font-family="monospace">64 (Fovea)</text>
-                <text x="${padX - 8}" y="${padY + graphH * 0.5 + 4}" fill="#64748b" font-size="10" text-anchor="end" font-family="monospace">35</text>
-                <text x="${padX - 8}" y="${padY + graphH + 4}" fill="#64748b" font-size="10" text-anchor="end" font-family="monospace">0</text>
+                <!-- Y Labels -->
+                <text x="${padX - 6}" y="${padY + 4}" fill="#7c8497" font-size="9" text-anchor="end" font-family="monospace">64</text>
+                <text x="${padX - 6}" y="${padY + graphH * 0.5 + 3}" fill="#7c8497" font-size="9" text-anchor="end" font-family="monospace">35</text>
+                <text x="${padX - 6}" y="${padY + graphH}" fill="#7c8497" font-size="9" text-anchor="end" font-family="monospace">0</text>
 
-                <!-- Baseline Reference Line (64 steps) -->
-                <line x1="${padX}" y1="${baselineY}" x2="${padX + graphW}" y2="${baselineY}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,4"/>
+                <!-- Baseline Reference -->
+                <line x1="${padX}" y1="${baselineY}" x2="${padX + graphW}" y2="${baselineY}" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,3"/>
 
-                <!-- Area Fill -->
-                <polygon points="${areaStr}" fill="rgba(6, 182, 212, 0.12)"/>
-
-                <!-- Step Curve -->
-                <polyline points="${polylineStr}" fill="none" stroke="#06b6d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Measured Step Curve -->
+                <polyline points="${polylineStr}" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         `;
     }
@@ -264,10 +201,9 @@ export class ResultsScreen {
         if (!this.currentSummary) return;
 
         const payload = {
-            project: 'Gaze-Adaptive Level-of-Detail Renderer',
-            venueTarget: 'Academic Research & Computer Vision Benchmark',
-            exportedAt: new Date().toISOString(),
-            summary: this.currentSummary
+            system: 'Gaze-Adaptive Foveated Renderer',
+            timestamp: new Date().toISOString(),
+            metrics: this.currentSummary
         };
 
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });

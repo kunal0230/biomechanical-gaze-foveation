@@ -1,6 +1,6 @@
 /**
- * DemoScreen - Interactive Real-Time Raymarching Simulation Screen
- * 45-second timed research session with telemetry HUD, shader parameter controls, and presentation simulator
+ * DemoScreen - Raymarching Simulation Screen with Real-Time HUD
+ * Utilitarian, distraction-free interface for visual testing and parameter adjustment
  */
 
 export class DemoScreen {
@@ -11,13 +11,12 @@ export class DemoScreen {
         this.onPauseToggle = null;
         this.onFoveaRadiusChange = null;
         this.onRingsToggle = null;
-        this.onEarlyFinish = null;
 
         this.timerInterval = null;
         this.remainingTime = 45;
         this.isRunning = false;
         this.isPaused = false;
-        this.gazeMode = 'camera'; // 'camera' | 'simulator'
+        this.gazeMode = 'camera';
 
         this._createLayout();
     }
@@ -28,87 +27,80 @@ export class DemoScreen {
                 <canvas id="render-canvas"></canvas>
                 
                 <div class="demo-overlay">
-                    <!-- Top Telemetry Header Bar -->
+                    <!-- Top Telemetry Bar -->
                     <div class="demo-top-bar">
-                        <div class="timer-container">
-                            <div class="timer-display" id="timer-display">
-                                <svg class="hud-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <polyline points="12 6 12 12 16 14"></polyline>
-                                </svg>
-                                <span class="timer-value" id="timer-value">45</span>
-                                <span class="timer-label">SEC</span>
+                        <div class="timer-cluster">
+                            <div class="timer-box" id="timer-display">
+                                <span class="t-val" id="timer-value">45</span>
+                                <span class="t-unit">s</span>
                             </div>
-                            <button class="pause-button" id="pause-button" title="Pause / Resume Session">
-                                <svg id="pause-icon-svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <rect x="6" y="4" width="4" height="16"></rect>
-                                    <rect x="14" y="4" width="4" height="16"></rect>
-                                </svg>
+                            <button class="icon-btn" id="pause-button" title="Pause / Resume Session">
+                                <span id="pause-btn-text">Pause</span>
                             </button>
                         </div>
 
-                        <!-- Live Real-Time Telemetry HUD -->
-                        <div class="telemetry-hud-pills">
-                            <div class="hud-pill">
-                                <span class="hud-label">FPS:</span>
-                                <span class="hud-val" id="hud-fps">60</span>
+                        <div class="hud-cluster">
+                            <div class="hud-stat">
+                                <span class="k">FPS:</span>
+                                <span class="v" id="hud-fps">60</span>
                             </div>
-                            <div class="hud-pill">
-                                <span class="hud-label">RAY STEPS:</span>
-                                <span class="hud-val" id="hud-steps">28.4 / 64</span>
+                            <div class="hud-divider">|</div>
+                            <div class="hud-stat">
+                                <span class="k">Steps:</span>
+                                <span class="v" id="hud-steps">28.5 / 64</span>
                             </div>
-                            <div class="hud-pill highlight">
-                                <span class="hud-label">GPU WORKLOAD SAVED:</span>
-                                <span class="hud-val" id="hud-savings">52%</span>
+                            <div class="hud-divider">|</div>
+                            <div class="hud-stat highlight">
+                                <span class="k">Workload Saved:</span>
+                                <span class="v" id="hud-savings">52%</span>
                             </div>
                         </div>
 
-                        <div class="demo-top-actions">
-                            <button class="cal-btn tertiary small" id="finish-early-btn">
-                                End Session & Analyze
-                            </button>
+                        <div class="top-action">
+                            <button class="sys-btn" id="finish-early-btn">End Session</button>
                         </div>
                     </div>
                     
-                    <!-- Bottom Parameter Controls Drawer -->
+                    <!-- Bottom Parameter Controls Bar -->
                     <div class="demo-controls-bar">
-                        <div class="control-group">
+                        <div class="ctrl-item">
                             <label for="fovea-slider">Fovea Radius</label>
                             <input type="range" id="fovea-slider" min="0.08" max="0.28" step="0.01" value="0.16">
-                            <span id="fovea-value" class="slider-val">0.16</span>
+                            <span id="fovea-value" class="mono-num">0.16</span>
                         </div>
 
-                        <div class="control-group">
-                            <label for="smoothing-slider">Filter Responsiveness</label>
+                        <div class="ctrl-item">
+                            <label for="smoothing-slider">Filter Smoothing</label>
                             <input type="range" id="smoothing-slider" min="0.5" max="3.0" step="0.1" value="1.0">
-                            <span id="smoothing-value" class="slider-val">1.0</span>
+                            <span id="smoothing-value" class="mono-num">1.0</span>
                         </div>
                         
-                        <div class="control-group checkbox-group">
+                        <label class="ctrl-checkbox">
                             <input type="checkbox" id="show-heatmap">
-                            <label for="show-heatmap">Compute Heatmap</label>
-                        </div>
+                            <span>Heatmap</span>
+                        </label>
 
-                        <div class="control-group checkbox-group">
+                        <label class="ctrl-checkbox">
                             <input type="checkbox" id="show-rings">
-                            <label for="show-rings">Visual Angle Rings (2°/5°)</label>
-                        </div>
+                            <span>Reticle Rings (2°/5°)</span>
+                        </label>
                         
-                        <div class="control-group checkbox-group">
+                        <label class="ctrl-checkbox">
                             <input type="checkbox" id="show-gaze" checked>
-                            <label for="show-gaze">Gaze Reticle</label>
-                        </div>
+                            <span>Gaze Point</span>
+                        </label>
                         
-                        <div class="control-group checkbox-group">
+                        <label class="ctrl-checkbox">
                             <input type="checkbox" id="debug-mode">
-                            <label for="debug-mode">Telemetry Inspector</label>
-                        </div>
+                            <span>Telemetry</span>
+                        </label>
                     </div>
                     
-                    <!-- Gaze Crosshair Reticle -->
-                    <div class="gaze-indicator" id="gaze-indicator">
-                        <div class="gaze-reticle-inner"></div>
-                        <div class="gaze-reticle-ring"></div>
+                    <!-- Gaze Reticle -->
+                    <div class="gaze-reticle" id="gaze-indicator">
+                        <div class="reticle-dot"></div>
+                        <div class="reticle-cross-h"></div>
+                        <div class="reticle-cross-v"></div>
                     </div>
                 </div>
             </div>
@@ -118,7 +110,7 @@ export class DemoScreen {
         this.timerDisplay = document.getElementById('timer-display');
         this.timerValue = document.getElementById('timer-value');
         this.pauseButton = document.getElementById('pause-button');
-        this.pauseIconSvg = document.getElementById('pause-icon-svg');
+        this.pauseBtnText = document.getElementById('pause-btn-text');
         this.finishEarlyBtn = document.getElementById('finish-early-btn');
 
         this.hudFps = document.getElementById('hud-fps');
@@ -256,31 +248,20 @@ export class DemoScreen {
     }
 
     _updatePauseButton() {
-        if (this.pauseIconSvg) {
-            if (this.isPaused) {
-                // Play icon
-                this.pauseIconSvg.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"></polygon>`;
-            } else {
-                // Pause icon
-                this.pauseIconSvg.innerHTML = `<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>`;
-            }
+        if (this.pauseBtnText) {
+            this.pauseBtnText.textContent = this.isPaused ? 'Resume' : 'Pause';
         }
         if (this.pauseButton) {
-            this.pauseButton.title = this.isPaused ? 'Resume Session' : 'Pause Session';
-            this.pauseButton.classList.toggle('paused', this.isPaused);
-        }
-        if (this.timerDisplay) {
-            this.timerDisplay.classList.toggle('paused', this.isPaused);
+            this.pauseButton.classList.toggle('active', this.isPaused);
         }
     }
 
     _updateTimerDisplay() {
         if (this.timerValue) this.timerValue.textContent = this.remainingTime;
-        if (this.remainingTime <= 10) {
-            this.timerDisplay.classList.add('warning');
-        }
         if (this.remainingTime <= 5) {
-            this.timerDisplay.classList.add('critical');
+            this.timerDisplay.classList.add('warn');
+        } else {
+            this.timerDisplay.classList.remove('warn');
         }
     }
 
@@ -316,7 +297,6 @@ export class DemoScreen {
     reset() {
         this.remainingTime = 45;
         this.isPaused = false;
-        this.timerDisplay.classList.remove('warning', 'critical', 'paused');
         this._updateTimerDisplay();
         this._updatePauseButton();
         this.showHeatmap.checked = false;
