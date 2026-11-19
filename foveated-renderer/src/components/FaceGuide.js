@@ -94,7 +94,7 @@ export class FaceGuide {
         // Anatomically proportional human face oval (width : height ≈ 0.72)
         const ovalCenterY = h * 0.48;
         const ovalCenterX = w * 0.5;
-        const ovalRadiusY = Math.min(h * 0.38, 140);
+        const ovalRadiusY = Math.min(h * 0.38, 155);
         const ovalRadiusX = Math.round(ovalRadiusY * 0.72);
 
         let guideColor = '#cf222e'; // red
