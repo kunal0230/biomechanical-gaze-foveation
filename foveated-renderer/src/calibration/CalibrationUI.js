@@ -155,7 +155,7 @@ export class CalibrationUI {
             if (ring) {
                 ring.style.transition = 'none';
                 ring.style.transform = 'scale(1.6)';
-                ring.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+                ring.style.borderColor = 'rgba(9, 105, 218, 0.3)';
             }
             this.status.textContent = `Point ${i + 1} of ${points.length}`;
             await this._delay(this.pulseDuration);
@@ -163,7 +163,7 @@ export class CalibrationUI {
             if (ring) {
                 ring.style.transition = `transform ${this.captureDuration}ms linear, border-color ${this.captureDuration}ms ease`;
                 ring.style.transform = 'scale(0.85)';
-                ring.style.borderColor = '#3b82f6';
+                ring.style.borderColor = '#0969da';
             }
 
             const captureStart = performance.now();

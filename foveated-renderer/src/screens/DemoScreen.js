@@ -1,6 +1,6 @@
 /**
  * DemoScreen - Raymarching Simulation Screen with Real-Time HUD
- * Utilitarian, distraction-free interface for visual testing and parameter adjustment
+ * Utilitarian research interface for visual testing, real-time performance telemetry, and parameter tuning.
  */
 
 export class DemoScreen {
@@ -42,17 +42,22 @@ export class DemoScreen {
                         <div class="hud-cluster">
                             <div class="hud-stat">
                                 <span class="k">FPS:</span>
-                                <span class="v" id="hud-fps">60</span>
+                                <span class="v" id="hud-fps">--</span>
                             </div>
                             <div class="hud-divider">|</div>
                             <div class="hud-stat">
-                                <span class="k">Steps:</span>
-                                <span class="v" id="hud-steps">28.5 / 64</span>
+                                <span class="k">Frame:</span>
+                                <span class="v" id="hud-frametime">-- ms</span>
+                            </div>
+                            <div class="hud-divider">|</div>
+                            <div class="hud-stat">
+                                <span class="k">Avg Steps:</span>
+                                <span class="v" id="hud-steps">-- / 64</span>
                             </div>
                             <div class="hud-divider">|</div>
                             <div class="hud-stat highlight">
-                                <span class="k">Workload Saved:</span>
-                                <span class="v" id="hud-savings">52%</span>
+                                <span class="k">GPU Saved:</span>
+                                <span class="v" id="hud-savings">--%</span>
                             </div>
                         </div>
 
@@ -70,14 +75,14 @@ export class DemoScreen {
                         </div>
 
                         <div class="ctrl-item">
-                            <label for="smoothing-slider">Filter Smoothing</label>
+                            <label for="smoothing-slider">Filter Cutoff</label>
                             <input type="range" id="smoothing-slider" min="0.5" max="3.0" step="0.1" value="1.0">
                             <span id="smoothing-value" class="mono-num">1.0</span>
                         </div>
                         
                         <label class="ctrl-checkbox">
                             <input type="checkbox" id="show-heatmap">
-                            <span>Heatmap</span>
+                            <span>Compute Heatmap</span>
                         </label>
 
                         <label class="ctrl-checkbox">
@@ -87,12 +92,12 @@ export class DemoScreen {
                         
                         <label class="ctrl-checkbox">
                             <input type="checkbox" id="show-gaze" checked>
-                            <span>Gaze Point</span>
+                            <span>Gaze Reticle</span>
                         </label>
                         
                         <label class="ctrl-checkbox">
                             <input type="checkbox" id="debug-mode">
-                            <span>Telemetry</span>
+                            <span>Telemetry Inspector</span>
                         </label>
                     </div>
                     
@@ -114,6 +119,7 @@ export class DemoScreen {
         this.finishEarlyBtn = document.getElementById('finish-early-btn');
 
         this.hudFps = document.getElementById('hud-fps');
+        this.hudFrameTime = document.getElementById('hud-frametime');
         this.hudSteps = document.getElementById('hud-steps');
         this.hudSavings = document.getElementById('hud-savings');
 
@@ -190,10 +196,19 @@ export class DemoScreen {
         return this.debugMode.checked;
     }
 
-    updateHud(fps, avgSteps, savingsPct) {
-        if (this.hudFps) this.hudFps.textContent = Math.round(fps);
-        if (this.hudSteps) this.hudSteps.textContent = `${avgSteps.toFixed(1)} / 64`;
-        if (this.hudSavings) this.hudSavings.textContent = `${Math.round(savingsPct)}%`;
+    updateHud(fps, frameTimeMs, avgSteps, savingsPct, inferenceMs = 0) {
+        if (this.hudFps) {
+            this.hudFps.textContent = typeof fps === 'number' ? fps.toFixed(1) : fps;
+        }
+        if (this.hudFrameTime) {
+            this.hudFrameTime.textContent = typeof frameTimeMs === 'number' ? `${frameTimeMs.toFixed(1)} ms` : `${frameTimeMs} ms`;
+        }
+        if (this.hudSteps) {
+            this.hudSteps.textContent = typeof avgSteps === 'number' ? `${avgSteps.toFixed(1)} / 64` : `${avgSteps} / 64`;
+        }
+        if (this.hudSavings) {
+            this.hudSavings.textContent = typeof savingsPct === 'number' ? `${savingsPct.toFixed(1)}%` : `${savingsPct}%`;
+        }
     }
 
     updateGazePosition(x, y) {
@@ -238,12 +253,23 @@ export class DemoScreen {
     }
 
     togglePause() {
-        if (!this.isRunning) return;
         this.isPaused = !this.isPaused;
         this._updatePauseButton();
-
         if (this.onPauseToggle) {
             this.onPauseToggle(this.isPaused);
+        }
+    }
+
+    _updateTimerDisplay() {
+        if (this.timerValue) {
+            this.timerValue.textContent = this.remainingTime;
+        }
+        if (this.timerDisplay) {
+            if (this.remainingTime <= 10) {
+                this.timerDisplay.classList.add('warn');
+            } else {
+                this.timerDisplay.classList.remove('warn');
+            }
         }
     }
 
@@ -256,33 +282,22 @@ export class DemoScreen {
         }
     }
 
-    _updateTimerDisplay() {
-        if (this.timerValue) this.timerValue.textContent = this.remainingTime;
-        if (this.remainingTime <= 5) {
-            this.timerDisplay.classList.add('warn');
-        } else {
-            this.timerDisplay.classList.remove('warn');
+    reset() {
+        this.stopTimer();
+        this.remainingTime = 45;
+        this._updateTimerDisplay();
+        if (this.showHeatmap) this.showHeatmap.checked = false;
+        if (this.showRings) this.showRings.checked = false;
+        if (this.showGaze) this.showGaze.checked = true;
+        if (this.debugMode) this.debugMode.checked = false;
+        if (this.foveaSlider) {
+            this.foveaSlider.value = 0.16;
+            this.foveaValue.textContent = '0.16';
         }
-    }
-
-    setOnTimerEnd(callback) {
-        this.onTimerEnd = callback;
-    }
-
-    setOnDebugToggle(callback) {
-        this.onDebugToggle = callback;
-    }
-
-    setOnPauseToggle(callback) {
-        this.onPauseToggle = callback;
-    }
-
-    setOnFoveaRadiusChange(callback) {
-        this.onFoveaRadiusChange = callback;
-    }
-
-    setOnRingsToggle(callback) {
-        this.onRingsToggle = callback;
+        if (this.smoothingSlider) {
+            this.smoothingSlider.value = 1.0;
+            this.smoothingValue.textContent = '1.0';
+        }
     }
 
     show() {
@@ -290,19 +305,13 @@ export class DemoScreen {
     }
 
     hide() {
-        this.container.style.display = 'none';
         this.stopTimer();
+        this.container.style.display = 'none';
     }
 
-    reset() {
-        this.remainingTime = 45;
-        this.isPaused = false;
-        this._updateTimerDisplay();
-        this._updatePauseButton();
-        this.showHeatmap.checked = false;
-        this.showRings.checked = false;
-        this.showGaze.checked = true;
-        this.debugMode.checked = false;
-        this.gazeIndicator.style.display = 'block';
-    }
+    setOnTimerEnd(cb) { this.onTimerEnd = cb; }
+    setOnDebugToggle(cb) { this.onDebugToggle = cb; }
+    setOnPauseToggle(cb) { this.onPauseToggle = cb; }
+    setOnFoveaRadiusChange(cb) { this.onFoveaRadiusChange = cb; }
+    setOnRingsToggle(cb) { this.onRingsToggle = cb; }
 }

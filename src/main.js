@@ -52,13 +52,15 @@ class App {
         this.video = null;
         this.stream = null;
 
-        // State
+        // State & Real-Time Performance Telemetry
         this.isRunning = false;
         this.isPaused = false;
         this.selectedScene = null;
         this.frameCount = 0;
-        this.fps = 60;
-        this.lastFpsTime = performance.now();
+        this.smoothFps = 60.0;
+        this.frameTimeMs = 16.6;
+        this.lastRenderTimestamp = performance.now();
+        this.lastHudUpdateTime = 0;
         this.lastLandmarks = null;
 
         // Gaze state (shared across render loop)
@@ -68,7 +70,7 @@ class App {
             rawX: 0.5,
             rawY: 0.5,
             avgSteps: 28.5,
-            currentSavingsPct: 52
+            currentSavingsPct: 55.4
         };
 
         this._setupSimulatorEvents();
@@ -169,7 +171,7 @@ class App {
             this._startFaceDetectionLoop();
         } catch (error) {
             console.warn('Camera access unavailable or declined:', error);
-            // Default to presentation simulator mode if camera is missing or denied
+            // Default to Demo Simulation mode if camera is missing or denied
             this.homeScreen.setMode('simulator');
         }
     }
@@ -186,7 +188,7 @@ class App {
 
             const now = performance.now();
             frameCount++;
-            if (now - lastFpsTime >= 1000) {
+            if (now - lastFpsTime >= 500) {
                 const fps = (frameCount * 1000) / (now - lastFpsTime);
                 if (this.video && this.video.videoWidth) {
                     this.homeScreen.updateStats(fps, this.video.videoWidth, this.video.videoHeight);
@@ -249,6 +251,10 @@ class App {
 
         this.filter.reset();
         this.isRunning = true;
+        this.smoothFps = 60.0;
+        this.frameTimeMs = 16.6;
+        this.lastRenderTimestamp = performance.now();
+        this.lastHudUpdateTime = 0;
 
         if (this.gazeMode === 'camera') {
             this._startGazeLoop();
@@ -300,29 +306,44 @@ class App {
     }
 
     _computeActiveWorkload(gazeX, gazeY) {
-        // Quantitative step density calculation based on foveal proximity
+        // Exact discrete 12x12 numerical integration of fragment raymarching LOD across screen space
+        const aspect = window.innerWidth / Math.max(1, window.innerHeight);
         const foveaRadius = this.renderer ? this.renderer.foveaRadius : 0.16;
-        const foveaAreaRatio = Math.PI * Math.pow(foveaRadius * 1.25, 2);
-        const parafoveaAreaRatio = Math.PI * Math.pow(foveaRadius * 2.2, 2) - foveaAreaRatio;
-        const peripheryAreaRatio = Math.max(0.1, 1.0 - (foveaAreaRatio + parafoveaAreaRatio));
+        const parafoveaRadius = foveaRadius * 2.2;
+        const range = Math.max(0.001, parafoveaRadius - foveaRadius);
 
-        const centerDistance = Math.hypot(gazeX - 0.5, gazeY - 0.5);
-        const edgeFactor = Math.max(0, centerDistance - 0.3) * 0.4;
+        let totalSteps = 0;
+        const N = 12;
+        for (let i = 0; i < N; i++) {
+            const u = (i + 0.5) / N;
+            for (let j = 0; j < N; j++) {
+                const v = (j + 0.5) / N;
+                const dx = (u - gazeX) * aspect;
+                const dy = (v - gazeY);
+                const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Weighted average steps across screen fragments
-        const avgSteps = Math.max(20.0, Math.min(64.0, 
-            (foveaAreaRatio * 64.0 + parafoveaAreaRatio * 40.0 + peripheryAreaRatio * 20.0) * (1.0 - edgeFactor * 0.15)
-        ));
+                // GLSL smoothstep(foveaRadius, parafoveaRadius, dist)
+                const edge = Math.max(0, Math.min(1, (dist - foveaRadius) / range));
+                const t = edge * edge * (3 - 2 * edge);
+                
+                // mix(64.0, 20.0, t)
+                const steps = 64.0 * (1 - t) + 20.0 * t;
+                totalSteps += steps;
+            }
+        }
 
+        const avgSteps = totalSteps / (N * N);
         const savingsPct = Math.max(0, Math.min(100, ((64.0 - avgSteps) / 64.0) * 100));
 
-        this.gazeState.avgSteps = avgSteps;
-        this.gazeState.currentSavingsPct = Math.round(savingsPct);
+        this.gazeState.avgSteps = Math.round(avgSteps * 10) / 10;
+        this.gazeState.currentSavingsPct = Math.round(savingsPct * 10) / 10;
     }
 
     _startRenderLoop() {
-        let renderFrameCount = 0;
-        let lastRenderTime = performance.now();
+        this.lastRenderTimestamp = performance.now();
+        this.smoothFps = 60.0;
+        this.frameTimeMs = 16.6;
+        this.lastHudUpdateTime = 0;
 
         const render = () => {
             if (!this.isRunning || this.currentScreen !== SCREENS.DEMO) return;
@@ -333,14 +354,21 @@ class App {
             }
 
             const now = performance.now();
-            renderFrameCount++;
-            if (now - lastRenderTime >= 1000) {
-                this.fps = (renderFrameCount * 1000) / (now - lastRenderTime);
-                renderFrameCount = 0;
-                lastRenderTime = now;
+            const deltaMs = now - this.lastRenderTimestamp;
+            this.lastRenderTimestamp = now;
+
+            // Genuine instantaneous and smoothed frame rate telemetry
+            if (deltaMs > 0 && deltaMs < 500) {
+                const instantFps = 1000 / deltaMs;
+                this.smoothFps = this.smoothFps * 0.90 + instantFps * 0.10;
+                this.frameTimeMs = this.frameTimeMs * 0.85 + deltaMs * 0.15;
             }
 
-            const { x: gazeX, y: gazeY, avgSteps, currentSavingsPct } = this.gazeState;
+            const { x: gazeX, y: gazeY } = this.gazeState;
+
+            // Numerical workload integration updated continuously
+            this._computeActiveWorkload(gazeX, gazeY);
+            const { avgSteps, currentSavingsPct } = this.gazeState;
 
             this.renderer.setGazePoint(gazeX, gazeY);
             this.renderer.setHeatmap(this.demoScreen.shouldShowHeatmap());
@@ -348,13 +376,22 @@ class App {
             this.renderer.render();
 
             this.demoScreen.updateGazePosition(gazeX, gazeY);
-            this.demoScreen.updateHud(this.fps, avgSteps, currentSavingsPct);
-            this.computeTracker.recordFrame(avgSteps, this.fps);
+
+            // Throttle HUD updates to ~12Hz for clean readability while visibly fluctuating in real time
+            if (now - this.lastHudUpdateTime >= 80) {
+                const inferenceMs = this.gazeEstimator.telemetry.inferenceMs || 0;
+                this.demoScreen.updateHud(this.smoothFps, this.frameTimeMs, avgSteps, currentSavingsPct, inferenceMs);
+                this.lastHudUpdateTime = now;
+            }
+
+            this.computeTracker.recordFrame(avgSteps, this.smoothFps);
 
             if (this.debugPanel.isVisible()) {
                 const tel = this.gazeEstimator.telemetry;
                 this.debugPanel.updateStats({
-                    fps: Math.round(this.fps),
+                    fps: this.smoothFps,
+                    frameTimeMs: this.frameTimeMs,
+                    inferenceMs: tel.inferenceMs || 0,
                     gazeX: gazeX,
                     gazeY: gazeY,
                     avgSteps: avgSteps,

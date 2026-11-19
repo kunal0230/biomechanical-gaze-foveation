@@ -95,13 +95,13 @@ export class FaceGuide {
         const ovalRadiusX = w * 0.22;
         const ovalRadiusY = h * 0.32;
 
-        let guideColor = '#e5534b'; // red
-        if (this.status === 'good') guideColor = '#57ab5a'; // green
-        else if (this.status === 'off_center') guideColor = '#d29922'; // yellow
-        else if (this.status === 'searching') guideColor = '#768390'; // gray
+        let guideColor = '#cf222e'; // red
+        if (this.status === 'good') guideColor = '#1a7f37'; // green
+        else if (this.status === 'off_center') guideColor = '#9a6700'; // yellow
+        else if (this.status === 'searching') guideColor = '#6e7781'; // gray
 
-        // Subdued vignette outside oval
-        ctx.fillStyle = 'rgba(13, 17, 23, 0.4)';
+        // Subdued light vignette outside oval
+        ctx.fillStyle = 'rgba(246, 248, 250, 0.4)';
         ctx.fillRect(0, 0, w, h);
 
         ctx.save();
@@ -120,7 +120,7 @@ export class FaceGuide {
 
         // 1px horizontal eye axis line
         const eyeLineY = ovalCenterY - ovalRadiusY * 0.15;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(ovalCenterX - ovalRadiusX * 0.6, eyeLineY);

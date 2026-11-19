@@ -1,6 +1,6 @@
 /**
  * ResultsScreen - Research Session Analytics Dashboard
- * Clean, structured scientific report comparing baseline vs selective compute costs
+ * Structured scientific evaluation report comparing uniform baseline vs gaze-adaptive LOD compute costs.
  */
 
 export class ResultsScreen {
@@ -16,7 +16,7 @@ export class ResultsScreen {
         this.container.innerHTML = `
             <div class="results-screen">
                 <header class="results-header">
-                    <h2>Session Performance Analysis</h2>
+                    <h2>Session Evaluation Report</h2>
                     <span class="sub-label">Uniform Raymarching Baseline vs Gaze-Adaptive LOD Evaluation</span>
                 </header>
                 
@@ -63,7 +63,7 @@ export class ResultsScreen {
                     <!-- Session Diagnostics Table -->
                     <div class="diagnostics-table">
                         <div class="diag-cell">
-                            <span class="diag-k">Session Duration:</span>
+                            <span class="diag-k">Trial Duration:</span>
                             <span class="diag-v" id="session-duration">45s</span>
                         </div>
                         <div class="diag-cell">
@@ -126,14 +126,14 @@ export class ResultsScreen {
 
         const savings = summary.savingsPct !== undefined ? summary.savingsPct : (summary.savingsPercent || 0);
         const durationSec = summary.durationSec || summary.sessionDurationSec || 45;
-        const avgFpsVal = summary.avgFps || (durationSec > 0 ? Math.round(totalFrames / durationSec) : 60);
+        const avgFpsVal = summary.avgFps || (durationSec > 0 ? (totalFrames / durationSec).toFixed(1) : 60);
 
         this.fullRenderCost.textContent = fullCost.toLocaleString();
         this.fullRenderSteps.textContent = fullSteps;
         this.fullRenderFrames.textContent = totalFrames.toLocaleString();
 
         this.selectiveRenderCost.textContent = selCost.toLocaleString();
-        this.selectiveAvgSteps.textContent = selAvgSteps;
+        this.selectiveAvgSteps.textContent = typeof selAvgSteps === 'number' ? selAvgSteps.toFixed(1) : selAvgSteps;
         this.selectiveFrames.textContent = totalFrames.toLocaleString();
 
         const savingsClamp = Math.max(0, Math.min(100, Math.round(savings * 10) / 10));
@@ -143,7 +143,7 @@ export class ResultsScreen {
         this.sessionDuration.textContent = `${durationSec}s`;
         this.framesCaptured.textContent = totalFrames.toLocaleString();
         this.avgFps.textContent = `${avgFpsVal} FPS`;
-        this.avgStepDensity.textContent = `${selAvgSteps} / ${fullSteps}`;
+        this.avgStepDensity.textContent = `${typeof selAvgSteps === 'number' ? selAvgSteps.toFixed(1) : selAvgSteps} / ${fullSteps}`;
 
         this._renderStepChart(summary.timeSeries || []);
     }
@@ -180,19 +180,19 @@ export class ResultsScreen {
         this.chartContainer.innerHTML = `
             <svg viewBox="0 0 ${width} ${height}" class="chart-svg">
                 <!-- Axes -->
-                <line x1="${padX}" y1="${padY + graphH}" x2="${padX + graphW}" y2="${padY + graphH}" stroke="#353b45"/>
-                <line x1="${padX}" y1="${padY}" x2="${padX}" y2="${padY + graphH}" stroke="#353b45"/>
+                <line x1="${padX}" y1="${padY + graphH}" x2="${padX + graphW}" y2="${padY + graphH}" stroke="#d0d7de" stroke-width="1"/>
+                <line x1="${padX}" y1="${padY}" x2="${padX}" y2="${padY + graphH}" stroke="#d0d7de" stroke-width="1"/>
 
                 <!-- Y Labels -->
-                <text x="${padX - 6}" y="${padY + 4}" fill="#7c8497" font-size="9" text-anchor="end" font-family="monospace">64</text>
-                <text x="${padX - 6}" y="${padY + graphH * 0.5 + 3}" fill="#7c8497" font-size="9" text-anchor="end" font-family="monospace">35</text>
-                <text x="${padX - 6}" y="${padY + graphH}" fill="#7c8497" font-size="9" text-anchor="end" font-family="monospace">0</text>
+                <text x="${padX - 6}" y="${padY + 4}" fill="#6e7781" font-size="9" text-anchor="end" font-family="monospace">64</text>
+                <text x="${padX - 6}" y="${padY + graphH * 0.5 + 3}" fill="#6e7781" font-size="9" text-anchor="end" font-family="monospace">35</text>
+                <text x="${padX - 6}" y="${padY + graphH}" fill="#6e7781" font-size="9" text-anchor="end" font-family="monospace">0</text>
 
                 <!-- Baseline Reference -->
-                <line x1="${padX}" y1="${baselineY}" x2="${padX + graphW}" y2="${baselineY}" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,3"/>
+                <line x1="${padX}" y1="${baselineY}" x2="${padX + graphW}" y2="${baselineY}" stroke="#cf222e" stroke-width="1" stroke-dasharray="3,3"/>
 
                 <!-- Measured Step Curve -->
-                <polyline points="${polylineStr}" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <polyline points="${polylineStr}" fill="none" stroke="#0969da" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         `;
     }

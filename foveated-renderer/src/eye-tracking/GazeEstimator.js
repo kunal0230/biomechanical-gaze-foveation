@@ -32,7 +32,7 @@ export class GazeEstimator {
         this.blinkThresholdRatio = 0.78;
         this.minHistory = 12;
 
-        // Head pose telemetry
+        // Head pose & pipeline telemetry
         this.telemetry = {
             pitchDeg: 0,
             yawDeg: 0,
@@ -43,7 +43,8 @@ export class GazeEstimator {
             velocityDegPerSec: 0,
             isSaccade: false,
             rhoH: 0.5,
-            ied: 0.3
+            ied: 0.3,
+            inferenceMs: 0
         };
 
         // Initialize default baseline model
@@ -122,8 +123,11 @@ export class GazeEstimator {
 
     async processFrame(video) {
         if (!this.isReady || !video || video.readyState < 2) return null;
+        const t0 = performance.now();
         try {
             await this.faceMesh.send({ image: video });
+            const dt = performance.now() - t0;
+            this.telemetry.inferenceMs = Math.round(dt * 10) / 10;
             return this.lastResults;
         } catch (err) {
             console.warn('FaceMesh frame processing error:', err);

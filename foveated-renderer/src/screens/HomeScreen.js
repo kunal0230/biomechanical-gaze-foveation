@@ -1,6 +1,6 @@
 /**
  * HomeScreen - Research Workstation Dashboard
- * Minimalist, utilitarian interface for camera alignment, environment selection, and mode setup
+ * Utilitarian interface for input mode selection, environment configuration, and sensor verification.
  */
 
 import { SceneCard } from '../components/SceneCard.js';
@@ -48,7 +48,7 @@ export class HomeScreen {
                     <section class="controls-column">
                         <!-- Mode Selector -->
                         <div class="panel-box">
-                            <label class="box-label">INPUT MODE</label>
+                            <label class="box-label">Input Mode</label>
                             <div class="mode-toggle">
                                 <button class="mode-btn active" id="mode-camera-btn">Webcam Eye Tracker</button>
                                 <button class="mode-btn" id="mode-sim-btn">Demo Simulation</button>
@@ -57,20 +57,20 @@ export class HomeScreen {
 
                         <!-- Environment Selector -->
                         <div class="panel-box">
-                            <label class="box-label">RAYMARCHING SCENE</label>
+                            <label class="box-label">Test Environment</label>
                             <div class="scene-list" id="scene-grid"></div>
                         </div>
 
                         <!-- Technical Parameter Summary -->
                         <div class="panel-box tech-specs">
-                            <label class="box-label">PIPELINE CONFIGURATION</label>
+                            <label class="box-label">Pipeline Parameters</label>
                             <div class="specs-grid">
                                 <div class="spec-row">
                                     <span class="spec-k">Foveal Step Budget:</span>
                                     <span class="spec-v">64 steps / ray</span>
                                 </div>
                                 <div class="spec-row">
-                                    <span class="spec-k">Peripheral Budget:</span>
+                                    <span class="spec-k">Peripheral Step Budget:</span>
                                     <span class="spec-v">20 steps / ray</span>
                                 </div>
                                 <div class="spec-row">
@@ -103,22 +103,22 @@ export class HomeScreen {
                             
                             <div class="camera-loader">
                                 <div class="loader-line"></div>
-                                <span>Waiting for video feed...</span>
+                                <span>Awaiting video stream...</span>
                             </div>
 
                             <div class="camera-telemetry">
                                 <span class="tel-item" id="stat-resolution">1280x720</span>
                                 <span class="tel-item" id="stat-fps">-- FPS</span>
-                                <span class="tel-item" id="stat-confidence">Tracking</span>
+                                <span class="tel-item" id="stat-confidence">Sensor Ready</span>
                             </div>
                         </div>
 
                         <div class="sim-panel" id="sim-panel" style="display:none;">
                             <div class="sim-panel-content">
                                 <h3>Demo Simulation Active</h3>
-                                <p>Cursor and touch movement directly control the gaze fixation point with simulated saccadic dynamics.</p>
-                                <p class="sim-note">Use this mode to evaluate foveated LOD scaling without requiring camera permissions or calibration.</p>
-                                <button class="btn primary" id="sim-launch-btn">Launch Demo Simulation</button>
+                                <p>Pointer and touch movement directly drive the gaze fixation point with simulated saccadic dynamics and 1-Euro adaptive smoothing.</p>
+                                <div class="sim-note">Direct hardware evaluation without requiring camera permissions or calibration.</div>
+                                <button class="btn primary" id="sim-launch-btn">Run Demo Simulation</button>
                             </div>
                         </div>
 
@@ -207,15 +207,15 @@ export class HomeScreen {
             this.modeCameraBtn.classList.remove('active');
             this.simPanel.style.display = 'flex';
             this.cameraPreview.style.display = 'none';
-            this.startBtn.textContent = 'Launch Demo Simulation';
+            this.startBtn.textContent = 'Run Demo Simulation';
             this.startBtn.disabled = false;
             this.statusInd.className = 'status-indicator ok';
-            this.statusMsg.textContent = 'Simulation ready (mouse-driven)';
+            this.statusMsg.textContent = 'Demo Simulation ready (pointer-driven)';
         } else {
             this.modeCameraBtn.classList.add('active');
             this.modeSimBtn.classList.remove('active');
             this.simPanel.style.display = 'none';
-            this.cameraPreview.style.display = 'block';
+            this.cameraPreview.style.display = 'flex';
             this.startBtn.textContent = 'Start Calibration';
             this.startBtn.disabled = !this.faceReady;
             this.updateFaceStatus(this.faceReady, this.faceReady);
@@ -262,7 +262,7 @@ export class HomeScreen {
         this.startBtn.disabled = !ready;
 
         if (this.statConfidence) {
-            this.statConfidence.textContent = detected ? (ready ? 'Aligned' : 'Acquiring') : 'Searching';
+            this.statConfidence.textContent = detected ? (ready ? 'Subject Aligned' : 'Acquiring') : 'Searching';
         }
 
         if (ready) {
@@ -270,7 +270,7 @@ export class HomeScreen {
             this.statusMsg.textContent = 'Subject aligned. Ready for calibration.';
         } else if (detected) {
             this.statusInd.className = 'status-indicator warn';
-            this.statusMsg.textContent = 'Center face in guide frame.';
+            this.statusMsg.textContent = 'Center face in camera view.';
         } else {
             this.statusInd.className = 'status-indicator';
             this.statusMsg.textContent = 'Searching for facial landmarks...';

@@ -1,5 +1,7 @@
 /**
  * DebugPanel - Technical Telemetry & Landmark Inspector
+ * Utilitarian research telemetry panel with real-time frame timings, MediaPipe inference latency,
+ * and biomechanical ocular metrics.
  */
 
 export class DebugPanel {
@@ -11,11 +13,13 @@ export class DebugPanel {
         this.statsContainer = null;
 
         this.stats = {
-            fps: 0,
-            gazeX: 0,
-            gazeY: 0,
-            avgSteps: 0,
-            savingsPct: 0,
+            fps: 60.0,
+            frameTimeMs: 16.6,
+            inferenceMs: 0.0,
+            gazeX: 0.5,
+            gazeY: 0.5,
+            avgSteps: 28.5,
+            savingsPct: 55.4,
             pitchDeg: 0,
             yawDeg: 0,
             rollDeg: 0,
@@ -37,45 +41,45 @@ export class DebugPanel {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 320px;
-            background: #16181d;
-            border: 1px solid #2d333b;
+            width: 330px;
+            background: #ffffff;
+            border: 1px solid #1f2328;
             border-radius: 4px;
             overflow: hidden;
             font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
             font-size: 11px;
-            color: #adbac7;
+            color: #1f2328;
             z-index: 1000;
             display: none;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
         `;
 
         const header = document.createElement('div');
         header.style.cssText = `
             padding: 6px 10px;
-            background: #21262d;
-            border-bottom: 1px solid #2d333b;
-            font-weight: 600;
+            background: #f6f8fa;
+            border-bottom: 1px solid #d0d7de;
+            font-weight: 700;
             font-size: 10px;
             letter-spacing: 0.05em;
-            color: #cdd9e5;
+            color: #1f2328;
             display: flex;
             justify-content: space-between;
         `;
         header.innerHTML = `
-            <span>TELEMETRY INSPECTOR</span>
-            <span style="color: #57ab5a;">ONLINE</span>
+            <span>DIAGNOSTIC TELEMETRY</span>
+            <span style="color: #1a7f37;">STREAMING</span>
         `;
         this.container.appendChild(header);
 
         this.videoCanvas = document.createElement('canvas');
-        this.videoCanvas.width = 320;
-        this.videoCanvas.height = 180;
+        this.videoCanvas.width = 330;
+        this.videoCanvas.height = 185;
         this.videoCanvas.style.cssText = `
             width: 100%;
             display: block;
-            background: #0d1117;
-            border-bottom: 1px solid #2d333b;
+            background: #f6f8fa;
+            border-bottom: 1px solid #d0d7de;
         `;
         this.container.appendChild(this.videoCanvas);
         this.videoCtx = this.videoCanvas.getContext('2d');
@@ -86,7 +90,8 @@ export class DebugPanel {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 4px 10px;
-            line-height: 1.4;
+            line-height: 1.45;
+            background: #ffffff;
         `;
         this.container.appendChild(this.statsContainer);
 
@@ -101,20 +106,24 @@ export class DebugPanel {
     _renderStats() {
         if (!this.visible) return;
 
-        const stateColor = this.stats.isSaccade ? '#d29922' : '#57ab5a';
+        const stateColor = this.stats.isSaccade ? '#9a6700' : '#1a7f37';
         const stateLabel = this.stats.isSaccade ? 'SACCADE' : 'FIXATION';
 
+        const fpsVal = typeof this.stats.fps === 'number' ? this.stats.fps.toFixed(1) : this.stats.fps;
+        const ftVal = typeof this.stats.frameTimeMs === 'number' ? this.stats.frameTimeMs.toFixed(1) : this.stats.frameTimeMs;
+        const infVal = typeof this.stats.inferenceMs === 'number' ? this.stats.inferenceMs.toFixed(1) : this.stats.inferenceMs;
+
         this.statsContainer.innerHTML = `
-            <div>FPS: <span style="color:#fff;">${this.stats.fps}</span></div>
-            <div>State: <span style="color:${stateColor};">${stateLabel}</span></div>
-            <div>Gaze X,Y: <span style="color:#539bf5;">${this.stats.gazeX.toFixed(2)}, ${this.stats.gazeY.toFixed(2)}</span></div>
-            <div>Steps: <span style="color:#fff;">${this.stats.avgSteps.toFixed(1)}</span></div>
-            <div>Pitch: <span style="color:#fff;">${this.stats.pitchDeg}°</span></div>
-            <div>Yaw: <span style="color:#fff;">${this.stats.yawDeg}°</span></div>
-            <div>Ratio ρ: <span style="color:#fff;">${this.stats.rhoH.toFixed(3)}</span></div>
-            <div>IED: <span style="color:#fff;">${this.stats.ied.toFixed(3)}</span></div>
-            <div>EAR: <span style="color:#fff;">${this.stats.ear.toFixed(2)}</span></div>
-            <div>Saved: <span style="color:#57ab5a;">${this.stats.savingsPct}%</span></div>
+            <div>FPS: <b>${fpsVal}</b></div>
+            <div>Frame: <b>${ftVal} ms</b></div>
+            <div>Inference: <b>${infVal} ms</b></div>
+            <div>State: <span style="font-weight:700;color:${stateColor};">${stateLabel}</span></div>
+            <div>Gaze X,Y: <span style="color:#0969da;font-weight:600;">${this.stats.gazeX.toFixed(3)}, ${this.stats.gazeY.toFixed(3)}</span></div>
+            <div>Ray Steps: <b>${this.stats.avgSteps.toFixed(1)} / 64</b></div>
+            <div>GPU Saved: <b style="color:#1a7f37;">${this.stats.savingsPct}%</b></div>
+            <div>Pitch/Yaw: <b>${this.stats.pitchDeg}° / ${this.stats.yawDeg}°</b></div>
+            <div>Ratio ρh: <b>${this.stats.rhoH.toFixed(3)}</b></div>
+            <div>IED: <b>${this.stats.ied.toFixed(3)}</b></div>
         `;
     }
 
@@ -140,7 +149,7 @@ export class DebugPanel {
             ctx.translate(w, 0);
             ctx.scale(-1, 1);
 
-            ctx.strokeStyle = 'rgba(83, 155, 245, 0.7)';
+            ctx.strokeStyle = '#0969da';
             ctx.lineWidth = 1;
 
             const drawContour = (indices) => {
@@ -157,17 +166,20 @@ export class DebugPanel {
                 ctx.stroke();
             };
 
+            // Eye contours
             drawContour([33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]);
             drawContour([263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466]);
 
-            ctx.strokeStyle = 'rgba(210, 153, 34, 0.8)';
+            // Eyebrows (IED reference)
+            ctx.strokeStyle = '#9a6700';
             drawContour([70, 63, 105, 66, 107]);
             drawContour([300, 293, 334, 296, 336]);
 
+            // Iris centers
             const drawIris = (centerIdx) => {
                 const iris = landmarks[centerIdx];
                 if (!iris) return;
-                ctx.fillStyle = '#539bf5';
+                ctx.fillStyle = '#0969da';
                 ctx.beginPath();
                 ctx.arc(iris.x * w, iris.y * h, 3, 0, Math.PI * 2);
                 ctx.fill();
@@ -176,9 +188,10 @@ export class DebugPanel {
             drawIris(468);
             drawIris(473);
 
+            // Nose tip canonical anchor
             const nose = landmarks[4];
             if (nose) {
-                ctx.fillStyle = '#e5534b';
+                ctx.fillStyle = '#cf222e';
                 ctx.beginPath();
                 ctx.arc(nose.x * w, nose.y * h, 2.5, 0, Math.PI * 2);
                 ctx.fill();
