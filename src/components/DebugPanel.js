@@ -14,6 +14,7 @@ export class DebugPanel {
 
         this.stats = {
             fps: 60.0,
+            cameraFps: 30.0,
             frameTimeMs: 16.6,
             inferenceMs: 0.0,
             gazeX: 0.5,
@@ -110,12 +111,14 @@ export class DebugPanel {
         const stateLabel = this.stats.isSaccade ? 'SACCADE' : 'FIXATION';
 
         const fpsVal = typeof this.stats.fps === 'number' ? this.stats.fps.toFixed(1) : this.stats.fps;
+        const camFpsVal = typeof this.stats.cameraFps === 'number' ? this.stats.cameraFps.toFixed(1) : (this.stats.cameraFps || '30.0');
         const ftVal = typeof this.stats.frameTimeMs === 'number' ? this.stats.frameTimeMs.toFixed(1) : this.stats.frameTimeMs;
         const infVal = typeof this.stats.inferenceMs === 'number' ? this.stats.inferenceMs.toFixed(1) : this.stats.inferenceMs;
 
         this.statsContainer.innerHTML = `
-            <div>FPS: <b>${fpsVal}</b></div>
-            <div>Frame: <b>${ftVal} ms</b></div>
+            <div>Render FPS: <b>${fpsVal}</b></div>
+            <div>Cam FPS: <b>${camFpsVal}</b></div>
+            <div>Frame Time: <b>${ftVal} ms</b></div>
             <div>Inference: <b>${infVal} ms</b></div>
             <div>State: <span style="font-weight:700;color:${stateColor};">${stateLabel}</span></div>
             <div>Gaze X,Y: <span style="color:#0969da;font-weight:600;">${this.stats.gazeX.toFixed(3)}, ${this.stats.gazeY.toFixed(3)}</span></div>
@@ -123,7 +126,6 @@ export class DebugPanel {
             <div>GPU Saved: <b style="color:#1a7f37;">${this.stats.savingsPct}%</b></div>
             <div>Pitch/Yaw: <b>${this.stats.pitchDeg}° / ${this.stats.yawDeg}°</b></div>
             <div>Ratio ρh: <b>${this.stats.rhoH.toFixed(3)}</b></div>
-            <div>IED: <b>${this.stats.ied.toFixed(3)}</b></div>
         `;
     }
 

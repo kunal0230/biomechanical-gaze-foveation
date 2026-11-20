@@ -41,7 +41,7 @@ export class DemoScreen {
 
                         <div class="hud-cluster">
                             <div class="hud-stat">
-                                <span class="k">FPS:</span>
+                                <span class="k">Render FPS:</span>
                                 <span class="v" id="hud-fps">--</span>
                             </div>
                             <div class="hud-divider">|</div>

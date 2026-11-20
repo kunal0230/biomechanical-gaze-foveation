@@ -300,9 +300,10 @@ export class HomeScreen {
         this.onModeChange = callback;
     }
 
-    updateStats(fps, width, height) {
+    updateStats(cameraFps, width, height) {
         if (this.statFps) {
-            this.statFps.textContent = `${Math.round(fps)} FPS`;
+            const val = typeof cameraFps === 'number' ? cameraFps.toFixed(1) : cameraFps;
+            this.statFps.textContent = `${val} FPS (Cam)`;
         }
         if (this.statResolution && width && height) {
             this.statResolution.textContent = `${width}x${height}`;

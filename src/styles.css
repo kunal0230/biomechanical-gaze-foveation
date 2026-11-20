@@ -440,6 +440,8 @@ html, body {
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
+  filter: contrast(1.05) saturate(1.03);
+  backface-visibility: hidden;
 }
 
 .camera-panel canvas {

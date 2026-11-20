@@ -59,6 +59,7 @@ class App {
         this.frameCount = 0;
         this.smoothFps = 60.0;
         this.frameTimeMs = 16.6;
+        this.cameraFps = 30.0;
         this.lastRenderTimestamp = performance.now();
         this.lastHudUpdateTime = 0;
         this.lastLandmarks = null;
@@ -166,6 +167,9 @@ class App {
             await this.video.play();
             this.homeScreen.showCameraActive();
 
+            // Measure genuine camera hardware capture framerate
+            this._startCameraFpsTracker();
+
             await this.gazeEstimator.initialize();
             this.faceGuide = new FaceGuide('camera-preview');
             this._startFaceDetectionLoop();
@@ -176,25 +180,79 @@ class App {
         }
     }
 
-    _startFaceDetectionLoop() {
-        let frameCount = 0;
-        let lastFpsTime = performance.now();
+    _startCameraFpsTracker() {
+        let deliveredFrames = 0;
+        let lastTimestamp = performance.now();
+        this.cameraFps = 30.0;
 
+        // Query initial hardware reported frame rate from camera track
+        if (this.stream) {
+            const track = this.stream.getVideoTracks()[0];
+            if (track && track.getSettings) {
+                const s = track.getSettings();
+                if (s.frameRate) {
+                    this.cameraFps = s.frameRate;
+                    if (this.homeScreen && this.video && this.video.videoWidth) {
+                        this.homeScreen.updateStats(this.cameraFps, this.video.videoWidth, this.video.videoHeight);
+                    }
+                }
+            }
+        }
+
+        // Measure live camera hardware presented frames via requestVideoFrameCallback
+        if (this.video && 'requestVideoFrameCallback' in this.video) {
+            const onVideoFrame = (now, metadata) => {
+                if (!this.stream || !this.video) return;
+                deliveredFrames++;
+                const elapsed = now - lastTimestamp;
+                if (elapsed >= 1000) {
+                    const actualFps = (deliveredFrames * 1000) / elapsed;
+                    // Exponential smoothing for steady, genuine camera FPS readout
+                    this.cameraFps = Math.round(actualFps * 10) / 10;
+                    deliveredFrames = 0;
+                    lastTimestamp = now;
+
+                    if (this.currentScreen === SCREENS.HOME && this.video.videoWidth) {
+                        this.homeScreen.updateStats(this.cameraFps, this.video.videoWidth, this.video.videoHeight);
+                    }
+                }
+                this.video.requestVideoFrameCallback(onVideoFrame);
+            };
+            this.video.requestVideoFrameCallback(onVideoFrame);
+        } else {
+            // Fallback for browsers without requestVideoFrameCallback: track video.currentTime increments
+            let lastCurrentTime = -1;
+            let timeChanges = 0;
+            let lastCheck = performance.now();
+
+            const checkFrame = () => {
+                if (!this.stream || !this.video) return;
+                if (this.video.currentTime !== lastCurrentTime) {
+                    lastCurrentTime = this.video.currentTime;
+                    timeChanges++;
+                }
+                const elapsed = performance.now() - lastCheck;
+                if (elapsed >= 1000) {
+                    const actualFps = (timeChanges * 1000) / elapsed;
+                    this.cameraFps = Math.round(actualFps * 10) / 10;
+                    timeChanges = 0;
+                    lastCheck = performance.now();
+
+                    if (this.currentScreen === SCREENS.HOME && this.video.videoWidth) {
+                        this.homeScreen.updateStats(this.cameraFps, this.video.videoWidth, this.video.videoHeight);
+                    }
+                }
+                requestAnimationFrame(checkFrame);
+            };
+            requestAnimationFrame(checkFrame);
+        }
+    }
+
+    _startFaceDetectionLoop() {
         const detectFace = async () => {
             if (this.currentScreen !== SCREENS.HOME) {
                 requestAnimationFrame(detectFace);
                 return;
-            }
-
-            const now = performance.now();
-            frameCount++;
-            if (now - lastFpsTime >= 500) {
-                const fps = (frameCount * 1000) / (now - lastFpsTime);
-                if (this.video && this.video.videoWidth) {
-                    this.homeScreen.updateStats(fps, this.video.videoWidth, this.video.videoHeight);
-                }
-                frameCount = 0;
-                lastFpsTime = now;
             }
 
             if (this.video && this.gazeEstimator && this.gazeEstimator.isReady) {
@@ -390,6 +448,7 @@ class App {
                 const tel = this.gazeEstimator.telemetry;
                 this.debugPanel.updateStats({
                     fps: this.smoothFps,
+                    cameraFps: this.cameraFps,
                     frameTimeMs: this.frameTimeMs,
                     inferenceMs: tel.inferenceMs || 0,
                     gazeX: gazeX,

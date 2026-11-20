@@ -102,23 +102,22 @@ export class FaceGuide {
         else if (this.status === 'off_center') guideColor = '#9a6700'; // yellow
         else if (this.status === 'searching') guideColor = '#6e7781'; // gray
 
-        // Subdued light vignette outside oval
-        ctx.fillStyle = 'rgba(246, 248, 250, 0.35)';
-        ctx.fillRect(0, 0, w, h);
-
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.beginPath();
-        ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        // 1px oval line
+        // Clean guide reticle without any milky wash/vignette over video
+        // 1.5px oval line
         ctx.strokeStyle = guideColor;
-        ctx.lineWidth = 1.4;
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
         ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, Math.PI * 2);
         ctx.stroke();
+
+        // Subtle dashed inner boundary for head positioning
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX - 4, ovalRadiusY - 4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
 
         // 1px horizontal eye axis line
         const eyeLineY = ovalCenterY - ovalRadiusY * 0.18;
