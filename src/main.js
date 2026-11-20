@@ -304,7 +304,7 @@ class App {
 
         this.demoScreen.reset();
         this.demoScreen.setGazeMode(this.gazeMode);
-        this.computeTracker.startSession(canvas.width, canvas.height);
+        this.computeTracker.startSession(canvas.width, canvas.height, this.gazeMode);
         this.demoScreen.startTimer();
 
         this.filter.reset();
@@ -442,7 +442,10 @@ class App {
                 this.lastHudUpdateTime = now;
             }
 
-            this.computeTracker.recordFrame(avgSteps, this.smoothFps);
+            const tel = this.gazeEstimator ? this.gazeEstimator.telemetry : {};
+            const camFpsToLog = this.gazeMode === 'camera' ? this.cameraFps : 0;
+            const infMsToLog = this.gazeMode === 'camera' ? (tel.inferenceMs || 0) : 0;
+            this.computeTracker.recordFrame(avgSteps, this.smoothFps, this.frameTimeMs, camFpsToLog, infMsToLog);
 
             if (this.debugPanel.isVisible()) {
                 const tel = this.gazeEstimator.telemetry;

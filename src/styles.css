@@ -1161,22 +1161,29 @@ html, body {
   background: #f6f8fa;
   border: 1px solid var(--border-color);
   border-radius: 2px;
-  padding: 8px 10px;
+  padding: 7px 9px;
+  min-width: 0;
 }
 
 .diag-k {
-  font-size: 0.72rem;
+  font-size: 0.70rem;
   color: var(--text-muted);
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .diag-v {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-main);
   margin-top: 2px;
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .results-actions {

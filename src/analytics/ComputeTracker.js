@@ -5,6 +5,7 @@
  * - Uniform Full-Quality Baseline Workload vs Foveated Adaptive Workload
  * - Percentage GPU Compute Workload Reduction
  * - Time-series step trajectory for SVG graph rendering
+ * - Real GPU Render Framerate, Frame Latency, Camera Ingest Rate & MediaPipe Latency
  * - LOD Zone Distribution Histogram (Fovea, Parafovea, Periphery)
  * - Research telemetry export (JSON)
  */
@@ -16,7 +17,13 @@ export class ComputeTracker {
         this.TARGET_FPS = 60;
 
         this.frameStepCounts = [];
+        this.renderFpsHistory = [];
+        this.frameTimeHistory = [];
+        this.cameraFpsHistory = [];
+        this.inferenceMsHistory = [];
         this.timeSeries = []; // Downsampled for graphing: { t, avgSteps, fps }
+
+        this.gazeMode = 'camera';
         this.sessionStartTime = null;
         this.sessionEndTime = null;
         this.isTracking = false;
@@ -25,9 +32,15 @@ export class ComputeTracker {
         this.lastSampleTime = 0;
     }
 
-    startSession(width = 1280, height = 720) {
+    startSession(width = 1280, height = 720, gazeMode = 'camera') {
         this.frameStepCounts = [];
+        this.renderFpsHistory = [];
+        this.frameTimeHistory = [];
+        this.cameraFpsHistory = [];
+        this.inferenceMsHistory = [];
         this.timeSeries = [];
+
+        this.gazeMode = gazeMode;
         this.pixelCount = width * height;
         this.sessionStartTime = performance.now();
         this.sessionEndTime = null;
@@ -35,10 +48,14 @@ export class ComputeTracker {
         this.lastSampleTime = this.sessionStartTime;
     }
 
-    recordFrame(avgSteps, currentFps = 60) {
+    recordFrame(avgSteps, renderFps = 60.0, frameTimeMs = 16.6, cameraFps = 0, inferenceMs = 0) {
         if (!this.isTracking) return;
 
         this.frameStepCounts.push(avgSteps);
+        if (renderFps > 0) this.renderFpsHistory.push(renderFps);
+        if (frameTimeMs > 0) this.frameTimeHistory.push(frameTimeMs);
+        if (cameraFps > 0) this.cameraFpsHistory.push(cameraFps);
+        if (inferenceMs > 0) this.inferenceMsHistory.push(inferenceMs);
 
         const now = performance.now();
         // Downsample timeseries points every 200ms
@@ -47,7 +64,7 @@ export class ComputeTracker {
             this.timeSeries.push({
                 t: Math.round(elapsedSec * 10) / 10,
                 steps: Math.round(avgSteps * 10) / 10,
-                fps: Math.round(currentFps)
+                fps: Math.round(renderFps * 10) / 10
             });
             this.lastSampleTime = now;
         }
@@ -104,13 +121,30 @@ export class ComputeTracker {
         const selective = this.getSelectiveRenderCost();
         const savings = this.getSavings();
 
-        const durationSec = this.sessionStartTime && this.sessionEndTime
-            ? Math.round((this.sessionEndTime - this.sessionStartTime) / 1000)
+        const durationMs = this.sessionStartTime && this.sessionEndTime
+            ? (this.sessionEndTime - this.sessionStartTime)
+            : 0;
+        const durationSec = Math.round((durationMs / 1000) * 10) / 10;
+
+        // Accurate GPU render FPS
+        const avgRenderFps = durationMs > 0 && full.totalFrames > 0
+            ? Math.round((full.totalFrames / (durationMs / 1000)) * 10) / 10
+            : 60.0;
+
+        // Mean frame latency
+        const avgFrameTimeMs = this.frameTimeHistory.length > 0
+            ? Math.round((this.frameTimeHistory.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length) * 10) / 10
+            : Math.round((1000 / Math.max(1, avgRenderFps)) * 10) / 10;
+
+        // Mean camera capture FPS
+        const avgCameraFps = this.cameraFpsHistory.length > 0
+            ? Math.round((this.cameraFpsHistory.reduce((a, b) => a + b, 0) / this.cameraFpsHistory.length) * 10) / 10
             : 0;
 
-        const avgFps = durationSec > 0 && full.totalFrames > 0
-            ? Math.round((full.totalFrames / durationSec) * 10) / 10
-            : 60;
+        // Mean inference latency
+        const avgInferenceMs = this.inferenceMsHistory.length > 0
+            ? Math.round((this.inferenceMsHistory.reduce((a, b) => a + b, 0) / this.inferenceMsHistory.length) * 10) / 10
+            : 0;
 
         // Zone Distribution
         let foveaCount = 0;
@@ -131,9 +165,14 @@ export class ComputeTracker {
         };
 
         return {
+            gazeMode: this.gazeMode,
             durationSec,
             totalFrames: full.totalFrames,
-            avgFps,
+            avgFps: avgRenderFps,
+            avgRenderFps,
+            avgFrameTimeMs,
+            avgCameraFps,
+            avgInferenceMs,
             fullRenderCost: full.computeUnits,
             selectiveRenderCost: selective.computeUnits,
             fullRenderSteps: this.FULL_RENDER_STEPS,
