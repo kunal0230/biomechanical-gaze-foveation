@@ -250,11 +250,22 @@ html, body {
   text-transform: uppercase;
 }
 
-.mode-toggle,
-.duration-toggle {
+.mode-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
+}
+
+.duration-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.duration-toggle .mode-btn {
+  padding: 8px 4px;
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .mode-btn {

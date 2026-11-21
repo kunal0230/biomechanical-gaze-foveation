@@ -18,7 +18,7 @@ export class HomeScreen {
 
         this.faceReady = false;
         this.gazeMode = 'camera'; // 'camera' | 'simulator'
-        this.trialDuration = 45; // 25 | 45
+        this.trialDuration = 45; // 15 | 25 | 45
         this.onDurationChange = null;
 
         this.scenes = [
@@ -62,6 +62,7 @@ export class HomeScreen {
                             <div class="panel-box">
                                 <label class="box-label">Trial Duration</label>
                                 <div class="duration-toggle">
+                                    <button class="mode-btn" id="dur-15-btn">15 Seconds</button>
                                     <button class="mode-btn" id="dur-25-btn">25 Seconds</button>
                                     <button class="mode-btn active" id="dur-45-btn">45 Seconds</button>
                                 </div>
@@ -183,6 +184,7 @@ export class HomeScreen {
 
         this.modeCameraBtn = document.getElementById('mode-camera-btn');
         this.modeSimBtn = document.getElementById('mode-sim-btn');
+        this.dur15Btn = document.getElementById('dur-15-btn');
         this.dur25Btn = document.getElementById('dur-25-btn');
         this.dur45Btn = document.getElementById('dur-45-btn');
         this.simPanel = document.getElementById('sim-panel');
@@ -192,7 +194,8 @@ export class HomeScreen {
         this.modeCameraBtn.addEventListener('click', () => this.setMode('camera'));
         this.modeSimBtn.addEventListener('click', () => this.setMode('simulator'));
 
-        // Duration Switching (25s vs 45s)
+        // Duration Switching (15s vs 25s vs 45s)
+        this.dur15Btn.addEventListener('click', () => this.setDuration(15));
         this.dur25Btn.addEventListener('click', () => this.setDuration(25));
         this.dur45Btn.addEventListener('click', () => this.setDuration(45));
 
@@ -315,7 +318,8 @@ export class HomeScreen {
 
     setDuration(duration) {
         this.trialDuration = duration;
-        if (this.dur25Btn && this.dur45Btn) {
+        if (this.dur15Btn && this.dur25Btn && this.dur45Btn) {
+            this.dur15Btn.classList.toggle('active', duration === 15);
             this.dur25Btn.classList.toggle('active', duration === 25);
             this.dur45Btn.classList.toggle('active', duration === 45);
         }

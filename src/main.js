@@ -30,7 +30,7 @@ class App {
     constructor() {
         this.currentScreen = SCREENS.HOME;
         this.gazeMode = 'camera'; // 'camera' | 'simulator'
-        this.trialDuration = 45; // 25 | 45
+        this.trialDuration = 45; // 15 | 25 | 45
 
         // Screens
         this.homeScreen = new HomeScreen('home-screen');
