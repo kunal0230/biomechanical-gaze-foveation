@@ -32,7 +32,7 @@ export class ComputeTracker {
         this.lastSampleTime = 0;
     }
 
-    startSession(width = 1280, height = 720, gazeMode = 'camera') {
+    startSession(width = 1280, height = 720, gazeMode = 'camera', targetDuration = 45) {
         this.frameStepCounts = [];
         this.renderFpsHistory = [];
         this.frameTimeHistory = [];
@@ -41,6 +41,7 @@ export class ComputeTracker {
         this.timeSeries = [];
 
         this.gazeMode = gazeMode;
+        this.targetDuration = targetDuration;
         this.pixelCount = width * height;
         this.sessionStartTime = performance.now();
         this.sessionEndTime = null;
@@ -166,6 +167,7 @@ export class ComputeTracker {
 
         return {
             gazeMode: this.gazeMode,
+            targetDuration: this.targetDuration || 45,
             durationSec,
             totalFrames: full.totalFrames,
             avgFps: avgRenderFps,

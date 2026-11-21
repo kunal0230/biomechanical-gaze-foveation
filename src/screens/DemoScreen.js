@@ -13,6 +13,7 @@ export class DemoScreen {
         this.onRingsToggle = null;
 
         this.timerInterval = null;
+        this.sessionDuration = 45;
         this.remainingTime = 45;
         this.isRunning = false;
         this.isPaused = false;
@@ -218,8 +219,9 @@ export class DemoScreen {
         }
     }
 
-    startTimer() {
-        this.remainingTime = 45;
+    startTimer(duration = this.sessionDuration) {
+        this.sessionDuration = duration;
+        this.remainingTime = duration;
         this.isRunning = true;
         this.isPaused = false;
         this._updateTimerDisplay();
@@ -282,9 +284,10 @@ export class DemoScreen {
         }
     }
 
-    reset() {
+    reset(duration = this.sessionDuration) {
         this.stopTimer();
-        this.remainingTime = 45;
+        this.sessionDuration = duration;
+        this.remainingTime = duration;
         this._updateTimerDisplay();
         if (this.showHeatmap) this.showHeatmap.checked = false;
         if (this.showRings) this.showRings.checked = false;

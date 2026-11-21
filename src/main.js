@@ -30,6 +30,7 @@ class App {
     constructor() {
         this.currentScreen = SCREENS.HOME;
         this.gazeMode = 'camera'; // 'camera' | 'simulator'
+        this.trialDuration = 45; // 25 | 45
 
         // Screens
         this.homeScreen = new HomeScreen('home-screen');
@@ -80,9 +81,10 @@ class App {
 
     async _init() {
         // Screen Callbacks
-        this.homeScreen.setOnStart((scene, mode) => {
+        this.homeScreen.setOnStart((scene, mode, duration) => {
             this.selectedScene = scene;
             this.gazeMode = mode;
+            if (duration) this.trialDuration = duration;
             if (mode === 'simulator') {
                 this._startDemo();
             } else {
@@ -90,10 +92,15 @@ class App {
             }
         });
 
-        this.homeScreen.setOnQuickStart((scene, mode) => {
+        this.homeScreen.setOnQuickStart((scene, mode, duration) => {
             this.selectedScene = scene;
             this.gazeMode = mode;
+            if (duration) this.trialDuration = duration;
             this._startDemo();
+        });
+
+        this.homeScreen.setOnDurationChange((duration) => {
+            this.trialDuration = duration;
         });
 
         this.homeScreen.setOnTutorial(() => this.tutorialModal.show());
@@ -302,10 +309,10 @@ class App {
         this.renderer.loadScene(this.selectedScene);
         this.renderer.resize();
 
-        this.demoScreen.reset();
+        this.demoScreen.reset(this.trialDuration);
         this.demoScreen.setGazeMode(this.gazeMode);
-        this.computeTracker.startSession(canvas.width, canvas.height, this.gazeMode);
-        this.demoScreen.startTimer();
+        this.computeTracker.startSession(canvas.width, canvas.height, this.gazeMode, this.trialDuration);
+        this.demoScreen.startTimer(this.trialDuration);
 
         this.filter.reset();
         this.isRunning = true;

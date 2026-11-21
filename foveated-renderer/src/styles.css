@@ -250,7 +250,8 @@ html, body {
   text-transform: uppercase;
 }
 
-.mode-toggle {
+.mode-toggle,
+.duration-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;

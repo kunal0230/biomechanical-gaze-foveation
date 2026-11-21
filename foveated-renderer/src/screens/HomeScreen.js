@@ -18,6 +18,8 @@ export class HomeScreen {
 
         this.faceReady = false;
         this.gazeMode = 'camera'; // 'camera' | 'simulator'
+        this.trialDuration = 45; // 25 | 45
+        this.onDurationChange = null;
 
         this.scenes = [
             new ForestValley(),
@@ -53,6 +55,15 @@ export class HomeScreen {
                                 <div class="mode-toggle">
                                     <button class="mode-btn active" id="mode-camera-btn">Webcam Eye Tracker</button>
                                     <button class="mode-btn" id="mode-sim-btn">Demo Simulation</button>
+                                </div>
+                            </div>
+
+                            <!-- Duration Selector -->
+                            <div class="panel-box">
+                                <label class="box-label">Trial Duration</label>
+                                <div class="duration-toggle">
+                                    <button class="mode-btn" id="dur-25-btn">25 Seconds</button>
+                                    <button class="mode-btn active" id="dur-45-btn">45 Seconds</button>
                                 </div>
                             </div>
 
@@ -172,6 +183,8 @@ export class HomeScreen {
 
         this.modeCameraBtn = document.getElementById('mode-camera-btn');
         this.modeSimBtn = document.getElementById('mode-sim-btn');
+        this.dur25Btn = document.getElementById('dur-25-btn');
+        this.dur45Btn = document.getElementById('dur-45-btn');
         this.simPanel = document.getElementById('sim-panel');
         this.simLaunchBtn = document.getElementById('sim-launch-btn');
 
@@ -179,19 +192,23 @@ export class HomeScreen {
         this.modeCameraBtn.addEventListener('click', () => this.setMode('camera'));
         this.modeSimBtn.addEventListener('click', () => this.setMode('simulator'));
 
+        // Duration Switching (25s vs 45s)
+        this.dur25Btn.addEventListener('click', () => this.setDuration(25));
+        this.dur45Btn.addEventListener('click', () => this.setDuration(45));
+
         this.simLaunchBtn.addEventListener('click', () => {
-            if (this.onQuickStart) this.onQuickStart(this.selectedScene, 'simulator');
+            if (this.onQuickStart) this.onQuickStart(this.selectedScene, 'simulator', this.trialDuration);
         });
 
         this.startBtn.addEventListener('click', () => {
             if (this.onStart && (this.faceReady || this.gazeMode === 'simulator')) {
-                this.onStart(this.selectedScene, this.gazeMode);
+                this.onStart(this.selectedScene, this.gazeMode, this.trialDuration);
             }
         });
 
         this.presetBtn.addEventListener('click', () => {
             if (this.onQuickStart) {
-                this.onQuickStart(this.selectedScene, this.gazeMode);
+                this.onQuickStart(this.selectedScene, this.gazeMode, this.trialDuration);
             }
         });
 
@@ -294,6 +311,25 @@ export class HomeScreen {
 
     setOnTutorial(callback) {
         this.onTutorial = callback;
+    }
+
+    setDuration(duration) {
+        this.trialDuration = duration;
+        if (this.dur25Btn && this.dur45Btn) {
+            this.dur25Btn.classList.toggle('active', duration === 25);
+            this.dur45Btn.classList.toggle('active', duration === 45);
+        }
+        if (this.onDurationChange) {
+            this.onDurationChange(duration);
+        }
+    }
+
+    getDuration() {
+        return this.trialDuration;
+    }
+
+    setOnDurationChange(callback) {
+        this.onDurationChange = callback;
     }
 
     setOnModeChange(callback) {

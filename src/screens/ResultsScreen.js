@@ -147,7 +147,7 @@ export class ResultsScreen {
         const selAvgSteps = summary.selectiveAvgSteps || (summary.selectiveRender ? summary.selectiveRender.avgStepsPerFrame : 0);
 
         const savings = summary.savingsPct !== undefined ? summary.savingsPct : (summary.savingsPercent || 0);
-        const durationSec = summary.durationSec || 45.0;
+        const durationSec = summary.durationSec || summary.targetDuration || 45.0;
 
         const avgRenderFps = summary.avgRenderFps || summary.avgFps || (durationSec > 0 ? (totalFrames / durationSec) : 60.0);
         const avgFrameTime = summary.avgFrameTimeMs || (avgRenderFps > 0 ? (1000 / avgRenderFps) : 16.6);
@@ -212,10 +212,11 @@ export class ResultsScreen {
         const height = 120;
         const padX = 35;
         const padY = 15;
+        const padBottom = 16;
         const graphW = width - 2 * padX;
-        const graphH = height - 2 * padY;
+        const graphH = height - padY - padBottom;
 
-        const maxT = timeSeries[timeSeries.length - 1].t || 45;
+        const maxT = timeSeries[timeSeries.length - 1].t || this.currentSummary?.durationSec || this.currentSummary?.targetDuration || 45;
         const minT = timeSeries[0].t || 0;
         const spanT = Math.max(1, maxT - minT);
 
@@ -228,6 +229,8 @@ export class ResultsScreen {
         });
 
         const polylineStr = points.join(' ');
+        const midT = (minT + spanT * 0.5).toFixed(1);
+        const endT = maxT.toFixed(1);
 
         this.chartContainer.innerHTML = `
             <svg viewBox="0 0 ${width} ${height}" class="chart-svg">
@@ -239,6 +242,16 @@ export class ResultsScreen {
                 <text x="${padX - 6}" y="${padY + 4}" fill="#6e7781" font-size="9" text-anchor="end" font-family="monospace">64</text>
                 <text x="${padX - 6}" y="${padY + graphH * 0.5 + 3}" fill="#6e7781" font-size="9" text-anchor="end" font-family="monospace">35</text>
                 <text x="${padX - 6}" y="${padY + graphH}" fill="#6e7781" font-size="9" text-anchor="end" font-family="monospace">0</text>
+
+                <!-- X Labels & Ticks -->
+                <line x1="${padX}" y1="${padY + graphH}" x2="${padX}" y2="${padY + graphH + 4}" stroke="#d0d7de" stroke-width="1"/>
+                <text x="${padX}" y="${padY + graphH + 13}" fill="#6e7781" font-size="9" text-anchor="start" font-family="monospace">0.0s</text>
+
+                <line x1="${padX + graphW * 0.5}" y1="${padY + graphH}" x2="${padX + graphW * 0.5}" y2="${padY + graphH + 4}" stroke="#d0d7de" stroke-width="1"/>
+                <text x="${padX + graphW * 0.5}" y="${padY + graphH + 13}" fill="#6e7781" font-size="9" text-anchor="middle" font-family="monospace">${midT}s</text>
+
+                <line x1="${padX + graphW}" y1="${padY + graphH}" x2="${padX + graphW}" y2="${padY + graphH + 4}" stroke="#d0d7de" stroke-width="1"/>
+                <text x="${padX + graphW}" y="${padY + graphH + 13}" fill="#6e7781" font-size="9" text-anchor="end" font-family="monospace">${endT}s</text>
 
                 <!-- Baseline Reference -->
                 <line x1="${padX}" y1="${baselineY}" x2="${padX + graphW}" y2="${baselineY}" stroke="#cf222e" stroke-width="1" stroke-dasharray="3,3"/>
